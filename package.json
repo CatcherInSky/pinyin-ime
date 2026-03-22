@@ -1,0 +1,56 @@
+{
+  "name": "pinyin-ime",
+  "version": "0.1.0",
+  "description": "React pinyin-to-Chinese IME for environments without a system input method (games, WebView, remote desktop).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build",
+    "site:dev": "pnpm run build && pnpm --filter pinyin-ime-site dev",
+    "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build"
+  },
+  "keywords": [
+    "react",
+    "pinyin",
+    "ime",
+    "input",
+    "chinese",
+    "input-method",
+    "shadcn"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.3.3",
+    "vite": "^6.2.0"
+  },
+  "workspaces": ["site"]
+}
