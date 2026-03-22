@@ -1,7 +1,7 @@
 {
   "name": "pinyin-ime",
-  "version": "0.2.0",
-  "description": "Pinyin-to-Chinese IME for React and Web Components (Lit), for environments without a system input method.",
+  "version": "0.3.0",
+  "description": "拼音转汉字输入法能力：在无法使用系统输入法的场景使用，通过候选框选词上屏",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -15,7 +15,8 @@
       "import": "./dist/element.js",
       "types": "./dist/element.d.ts"
     },
-    "./pinyin-ime.css": "./dist/pinyin-ime.css"
+    "./pinyin-ime.css": "./dist/pinyin-ime.css",
+    "./google-pinyin-dict.json": "./dist/google-pinyin-dict.json"
   },
   "files": [
     "dist",
@@ -27,12 +28,13 @@
   ],
   "scripts": {
     "prebuild": "node scripts/embed-css.mjs",
-    "build": "tsup",
+    "build": "tsup && tsx scripts/write-google-pinyin-dict-json.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
-    "site:dev": "pnpm run build && pnpm --filter pinyin-ime-site dev",
-    "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build"
+    "site:dev": "pnpm --filter pinyin-ime-site dev",
+    "site:build": "pnpm --filter pinyin-ime-site build",
+    "publish:npm": "pnpm publish --no-git-checks --registry https://registry.npmjs.org/"
   },
   "keywords": [
     "react",
@@ -45,15 +47,15 @@
     "lit"
   ],
   "license": "MIT",
-  "author": "",
+  "author": "catcherinsky",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhang/pinyin-ime.git"
+    "url": "https://github.com/catcherinsky/pinyin-ime.git"
   },
   "bugs": {
-    "url": "https://github.com/zhang/pinyin-ime/issues"
+    "url": "https://github.com/catcherinsky/pinyin-ime/issues"
   },
-  "homepage": "https://github.com/zhang/pinyin-ime#readme",
+  "homepage": "https://github.com/catcherinsky/pinyin-ime#readme",
   "engines": {
     "node": ">=18"
   },
@@ -71,6 +73,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tsup": "^8.3.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vite": "^6.2.0",
     "vitest": "^3.0.5"

@@ -8,7 +8,7 @@
 - **任意框架 / 无框架**：可通过子路径 **`pinyin-ime/element`** 使用 Lit 实现的 **`<pinyin-ime-editor>`** 自定义元素（`lit` 已打入该入口，无需单独安装）。  
 - **Vue**：无官方 Vue 组件；推荐在模板中直接使用 `<pinyin-ime-editor>`，并在构建工具中将该标签识别为自定义元素（示例见本仓库 [`site/`](site/)）。
 
-在线演示：将 [`site/vite.config.ts`](site/vite.config.ts) 的 `base` 与部署路径对齐后，可由 GitHub Pages 等托管 `site/dist`。
+在线演示：将 [`site/vite.config.ts`](site/vite.config.ts) 的 `base` 与仓库的 GitHub Pages 路径对齐后部署 `site/dist`。演示站通过 [`site/package.json`](site/package.json) 从 **npm** 安装 `pinyin-ime`（`npm:` 协议，避免与仓库根包 workspace 链接），发新版库后如需固定演示版本可收紧该依赖范围。多页 HTML 入口在 `site` 根目录与各子目录（[`site/index.html`](site/index.html)、[`site/react/`](site/react/)、[`site/vue/`](site/vue/)、[`site/web_component/`](site/web_component/)），与 `base: '/pinyin-ime/'` 一致；本地开发请打开 **`http://localhost:5173/pinyin-ime/`**（勿省略前缀）。
 
 ---
 
@@ -21,7 +21,7 @@ pnpm add pinyin-ime
 
 **对等依赖**：主入口 `pinyin-ime` 声明 `react`、`react-dom`（建议 18+）。若项目 **仅** 使用 `pinyin-ime/element` 与样式子路径、不装 React，安装器可能对 peer 给出警告，可按包管理器文档选择忽略或配置（例如 pnpm 的 `peerDependencyRules`）。
 
-**构建产物**：发布包以 `dist/` 下的 **编译后 ESM + `.d.ts`** 为主；使用前请在本仓库根目录执行 `pnpm run build`，保证 `dist` 存在（`pnpm run site:dev` 会先 build 再启 demo）。
+**构建产物**：发布包以 `dist/` 下的 **编译后 ESM + `.d.ts`** 为主；在仓库里开发库时请执行 `pnpm run build` 保证 `dist` 存在。**演示站** `site/` 默认从 **npm** 解析 `pinyin-ime`，本地改库后若要演示站跟本地 `dist` 一致，需改回 workspace 链接或发版后再装新版本。
 
 ### 1.1 React
 
@@ -73,7 +73,7 @@ import "pinyin-ime/pinyin-ime.css";
 3. 在模板里写 **`<pinyin-ime-editor>`**，监听 **`pinyin-ime-change`**，`event.detail.value` 为字符串。  
 4. 使用 **Vite** 时，在 `@vitejs/plugin-vue` 中配置 **`compilerOptions.isCustomElement`**，例如 `(tag) => tag === "pinyin-ime-editor"`，避免 Vue 把未知标签当普通组件解析。
 
-完整可运行示例见 **[`site/src/VueWcDemo.vue`](site/src/VueWcDemo.vue)** 与 **[`site/vite.config.ts`](site/vite.config.ts)**。
+完整可运行示例见 **[`site/src/vue/VuePage.vue`](site/src/vue/VuePage.vue)** 与 **[`site/vite.config.ts`](site/vite.config.ts)**。
 
 ```vue
 <script setup lang="ts">
@@ -113,7 +113,7 @@ el.addEventListener("pinyin-ime-change", (e) => {
 document.body.append(el);
 ```
 
-与 **React 并列挂载**、**动态 import** 的演示见 **[`site/src/App.tsx`](site/src/App.tsx)** 中的 `NativeWcDemo`。
+独立页面演示见 **[`site/src/react/react-page.tsx`](site/src/react/react-page.tsx)**（React 内挂载自定义元素）与 **[`site/src/wc/wc-main.ts`](site/src/wc/wc-main.ts)**（纯 DOM）。
 
 ---
 
@@ -212,6 +212,13 @@ import "pinyin-ime/pinyin-ime.css";
 - **`dictionary`**：已解析的对象，适合小表或与打包器拆分的 JSON 模块。  
 - **`getEngine()`**：返回 **`createPinyinEngine(dict)`** 的实例，优先级最高，可实现缓存、多源合并等。
 
+### 4.4 构建体积：`index.js` / `element.js` 与词典
+
+- **为何曾经各约 5MB**：`src/google_pinyin_dict.ts` 内嵌整本词典；若用 **两次独立的 tsup 构建**（先 `index.ts`、再 `element.ts`），esbuild 无法在两次运行之间复用模块，**同一份词典会被完整打进两个入口**，体积几乎翻倍。  
+- **当前仓库做法**：`tsup.config.ts` 使用 **单次多入口**（`index` + `element`）并开启 **`splitting: true`（仅 ESM）**，共享依赖（含词典）落到 **`dist/chunk-*.js`**，`index.js` / `element.js` 只保留入口胶水代码。部署 npm 包或静态资源时，请 **一并发布所有 `dist/*.js`**，否则相对路径的 chunk 会 404。  
+- **单独词典文件**：`pnpm run build` 会在 `dist/google-pinyin-dict.json` 再写一份 JSON（与内嵌数据一致），并通过子路径 **`pinyin-ime/google-pinyin-dict.json`** 暴露。业务里可设 `dictionaryUrl`（或自定义 `fetch`）指向该文件，便于 CDN 缓存或与内嵌默认引擎并存。  
+- **若希望应用首包不含内嵌词典**：需要避免从主入口引用会 **静态拉取 `defaultPinyinEngine` / `dict`** 的 API（例如 `getCandidates`、`computeMatchedLength` 等），并改用 **`createPinyinEngine` + `loadGooglePinyinDictFromUrl`** 等自行装配；这属于进阶用法，当前包仍以「开箱即用内嵌词典」为主。
+
 ---
 
 ## 快捷键
@@ -231,8 +238,8 @@ import "pinyin-ime/pinyin-ime.css";
 pnpm install
 pnpm run test
 pnpm run build              # 生成根目录 dist/（npm 发布内容）
-pnpm run site:dev           # 先 build 库，再启动 site（含 React + Vue + WC 示例）
-pnpm run site:build         # 构建 site/dist
+pnpm run site:dev           # 启动 site（依赖 registry 中的 pinyin-ime，见 site/package.json）
+pnpm run site:build         # 构建 site/dist（同上）
 ```
 
 发布前可使用 `pnpm pack` / `npm pack --dry-run` 检查打包包容。

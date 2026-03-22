@@ -3,8 +3,10 @@ export default {
   darkMode: ["class"],
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "../dist/index.js",
+    "./react/index.html",
+    "./vue/index.html",
+    "./web_component/index.html",
+    "./src/**/*.{js,ts,jsx,tsx,vue}",
   ],
   theme: {
     extend: {

@@ -23,17 +23,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "pnpm"
 
-      - name: Install and build library + site
+      - name: Install and build site (pinyin-ime from npm)
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          npm install
-          npm run build
-          npm run site:build
+          pnpm install
+          pnpm run site:build
 
       - uses: actions/upload-pages-artifact@v3
         with:
