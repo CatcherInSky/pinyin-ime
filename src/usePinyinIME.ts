@@ -3,21 +3,44 @@
  * @description 拼音输入法状态管理 Hook（无 i18n / 业务耦合）
  */
 import * as React from "react";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { getCandidates, computeMatchedLength } from "./pinyin";
-import type { CandidateItem } from "./pinyin";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+  useSyncExternalStore,
+} from "react";
+import type { GooglePinyinDict } from "./google_pinyin_dict";
+import {
+  createPinyinEngine,
+  type PinyinEngine,
+} from "./pinyin-engine";
+import { defaultPinyinEngine } from "./pinyin";
+import { loadGooglePinyinDictFromUrl } from "./load-dictionary";
+import type { CandidateItem } from "./pinyin-engine";
+import { PinyinIMEController } from "./pinyin-ime-controller";
+import type { PopupPosition } from "./types";
 
 /** 默认每页候选数量（与数字键 1–3 的原始设计一致） */
 export const PAGE_SIZE = 3;
 
-/** 候选框位置信息 */
-export interface PopupPosition {
-  top: number;
-  left: number;
-  width: number;
-}
+export type { PopupPosition };
 
-/** `usePinyinIME` 的可选配置 */
+/**
+ * 远程词典加载状态（仅在使用 `dictionaryUrl` 时有意义）。
+ */
+export type DictionaryLoadState = "idle" | "loading" | "ready" | "error";
+
+/**
+ * 词典来源优先级（后者仅在前者未提供时生效）：
+ *
+ * 1. {@link UsePinyinIMEOptions.getEngine}
+ * 2. {@link UsePinyinIMEOptions.dictionary}（内存中的 {@link GooglePinyinDict}）
+ * 3. {@link UsePinyinIMEOptions.dictionaryUrl}（`fetch` JSON）
+ * 4. 包内嵌默认词典 {@link defaultPinyinEngine}
+ */
 export interface UsePinyinIMEOptions {
   /**
    * 为 `false` 时不拦截键盘，等价于普通受控输入。
@@ -29,6 +52,30 @@ export interface UsePinyinIMEOptions {
    * @defaultValue {@link PAGE_SIZE}
    */
   pageSize?: number;
+  /**
+   * 完全自定义引擎（最高优先级）。
+   */
+  getEngine?: () => PinyinEngine | null;
+  /**
+   * 直接使用已解析的词典对象构建引擎。
+   */
+  dictionary?: GooglePinyinDict;
+  /**
+   * 从该 URL `fetch` JSON 词典（需 CORS）；加载完成前候选为空。
+   */
+  dictionaryUrl?: string;
+  /**
+   * 传给 `fetch(dictionaryUrl, init)` 的选项。
+   */
+  dictionaryFetchInit?: RequestInit;
+  /**
+   * 远程词典成功加载并创建引擎后调用。
+   */
+  onDictionaryLoaded?: () => void;
+  /**
+   * 远程词典加载或解析失败时调用。
+   */
+  onDictionaryLoadError?: (error: unknown) => void;
 }
 
 /** usePinyinIME hook 的返回值 */
@@ -61,79 +108,12 @@ export interface UsePinyinIMEReturn<
   handleKeyDown: React.KeyboardEventHandler<T>;
   /** 拦截默认插入文本（与拼音/翻页键冲突时），与 handleKeyDown 配合 */
   handleBeforeInput: React.FormEventHandler<T>;
-}
-
-/**
- * 将每页条数限制在 1–9，以便用单个数字键选词。
- *
- * @param n - 期望的每页条数
- * @returns 夹在 1–9 的值
- */
-function clampPageSize(n: number): number {
-  if (!Number.isFinite(n)) return PAGE_SIZE;
-  return Math.min(9, Math.max(1, Math.floor(n)));
-}
-
-/**
- * 翻页或与拼音控制相关、需屏蔽默认输入的键（含 `e.code`、Shift+= 的 `+`、小键盘）。
- *
- * @param e - 键盘事件
- * @returns 是否为翻页/控制符号键
- */
-function isPagingOrControlSymbolKey(e: React.KeyboardEvent): boolean {
-  if (["=", ".", "-", ","].includes(e.key)) return true;
-  if (e.key === "+" || e.key === "_") return true;
-  const c = e.code;
-  return (
-    c === "Equal" ||
-    c === "Minus" ||
-    c === "Period" ||
-    c === "Comma" ||
-    c === "NumpadSubtract" ||
-    c === "NumpadAdd" ||
-    c === "NumpadDecimal"
-  );
-}
-
-/**
- * 是否视为「下一页」候选。
- *
- * @param e - 键盘事件
- * @returns 是否为下一页
- */
-function isNextPageKey(e: React.KeyboardEvent): boolean {
-  if (e.key === "=" || e.key === "." || e.key === "+") return true;
-  const c = e.code;
-  return (
-    c === "Equal" ||
-    c === "Period" ||
-    c === "NumpadAdd" ||
-    c === "NumpadDecimal"
-  );
-}
-
-/**
- * 是否视为「上一页」候选。
- *
- * @param e - 键盘事件
- * @returns 是否为上一页
- */
-function isPrevPageKey(e: React.KeyboardEvent): boolean {
-  if (e.key === "-" || e.key === "," || e.key === "_") return true;
-  const c = e.code;
-  return c === "Minus" || c === "Comma" || c === "NumpadSubtract";
-}
-
-/**
- * 判断按键是否为当前页大小范围内的数字选词键。
- *
- * @param key - `KeyboardEvent.key`
- * @param pageSize - 每页候选数
- * @returns 是否为 `1`…`pageSize`
- */
-function isDigitSelectKey(key: string, pageSize: number): boolean {
-  const d = parseInt(key, 10);
-  return /^[1-9]$/.test(key) && d >= 1 && d <= pageSize;
+  /**
+   * 使用 `dictionaryUrl` 时的加载状态；否则为 `idle`。
+   */
+  dictionaryLoadState: DictionaryLoadState;
+  /** 最近一次远程加载错误 */
+  dictionaryError: Error | null;
 }
 
 /**
@@ -141,11 +121,12 @@ function isDigitSelectKey(key: string, pageSize: number): boolean {
  *
  * @remarks
  * 支持递进选词、拼音串内光标、数字选词、翻页与防输入泄漏。
+ * 词典来源见 {@link UsePinyinIMEOptions} 优先级说明。
  *
  * @param value - 受控值
  * @param onChange - 值变化回调
- * @param onKeyDown - 可选，非 IME 拦截路径上的键盘回调
- * @param options - 可选：`enabled`、`pageSize`
+ * @param onKeyDown - 可选，非 IME 拦截路径上的键盘回调（参数为 React 合成事件，与 `nativeEvent` 共享同一底层事件）
+ * @param options - 可选：启用、分页、词典
  * @returns IME 状态与事件处理器
  */
 export function usePinyinIME<T extends HTMLInputElement | HTMLTextAreaElement>(
@@ -155,18 +136,112 @@ export function usePinyinIME<T extends HTMLInputElement | HTMLTextAreaElement>(
   options?: UsePinyinIMEOptions
 ): UsePinyinIMEReturn<T> {
   const enabled = options?.enabled !== false;
-  const pageSize = useMemo(
-    () => clampPageSize(options?.pageSize ?? PAGE_SIZE),
-    [options?.pageSize]
-  );
+  const pageSizeOpt = options?.pageSize ?? PAGE_SIZE;
 
-  const [pinyinInput, setPinyinInput] = useState("");
-  const [pinyinCursorPosition, setPinyinCursorPosition] = useState(0);
-  const [candidates, setCandidates] = useState<CandidateItem[]>([]);
-  const [page, setPage] = useState(0);
   const [position, setPosition] = useState<PopupPosition | null>(null);
-
   const elementRef = useRef<T>(null);
+  const onKeyDownRef = useRef(onKeyDown);
+  onKeyDownRef.current = onKeyDown;
+
+  /** 避免内联 `onChange` 导致 `useLayoutEffect` 每帧执行并触发 `emit` 死循环 */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const [urlEngine, setUrlEngine] = useState<PinyinEngine | null>(null);
+  const [dictionaryLoadState, setDictionaryLoadState] =
+    useState<DictionaryLoadState>("idle");
+  const [dictionaryError, setDictionaryError] = useState<Error | null>(null);
+
+  const inlineEngine = useMemo(() => {
+    if (!options?.dictionary) return null;
+    return createPinyinEngine(options.dictionary);
+  }, [options?.dictionary]);
+
+  const onDictionaryLoadedRef = useRef(options?.onDictionaryLoaded);
+  const onDictionaryLoadErrorRef = useRef(options?.onDictionaryLoadError);
+  onDictionaryLoadedRef.current = options?.onDictionaryLoaded;
+  onDictionaryLoadErrorRef.current = options?.onDictionaryLoadError;
+
+  useEffect(() => {
+    const url = options?.dictionaryUrl;
+    if (!url) {
+      setUrlEngine(null);
+      setDictionaryLoadState("idle");
+      setDictionaryError(null);
+      return;
+    }
+    let cancelled = false;
+    setDictionaryLoadState("loading");
+    setDictionaryError(null);
+    loadGooglePinyinDictFromUrl(url, options.dictionaryFetchInit)
+      .then((d) => {
+        if (cancelled) return;
+        setUrlEngine(createPinyinEngine(d));
+        setDictionaryLoadState("ready");
+        onDictionaryLoadedRef.current?.();
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setUrlEngine(null);
+        setDictionaryLoadState("error");
+        const err = e instanceof Error ? e : new Error(String(e));
+        setDictionaryError(err);
+        onDictionaryLoadErrorRef.current?.(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [options?.dictionaryUrl, options?.dictionaryFetchInit]);
+
+  const resolvedEngine = useMemo((): PinyinEngine | null => {
+    if (options?.getEngine) return options.getEngine();
+    if (inlineEngine) return inlineEngine;
+    if (options?.dictionaryUrl) return urlEngine;
+    return defaultPinyinEngine;
+  }, [
+    options?.getEngine,
+    options?.dictionaryUrl,
+    inlineEngine,
+    urlEngine,
+  ]);
+
+  const controllerRef = useRef<PinyinIMEController<T> | null>(null);
+  if (!controllerRef.current) {
+    controllerRef.current = new PinyinIMEController<T>({
+      getValue: () => "",
+      onValueChange: () => {},
+      getElement: () => elementRef.current,
+      getEngine: () => null,
+      enabled: true,
+      pageSize: pageSizeOpt,
+      onKeyDown: (ev: KeyboardEvent) => {
+        onKeyDownRef.current?.(ev as unknown as React.KeyboardEvent<T>);
+      },
+    });
+  }
+
+  useLayoutEffect(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    c.setOptions({
+      getValue: () => String(value ?? ""),
+      onValueChange: (v: string) => onChangeRef.current?.(v),
+      getElement: () => elementRef.current,
+      getEngine: () => resolvedEngine,
+      enabled,
+      pageSize: pageSizeOpt,
+      onKeyDown: (ev: KeyboardEvent) => {
+        onKeyDownRef.current?.(ev as unknown as React.KeyboardEvent<T>);
+      },
+    });
+  }, [value, resolvedEngine, enabled, pageSizeOpt]);
+
+  const snap = useSyncExternalStore(
+    (onStoreChange: () => void) =>
+      controllerRef.current!.subscribe(onStoreChange),
+    () => controllerRef.current!.getSnapshot(),
+    () => controllerRef.current!.getSnapshot()
+  );
 
   const updatePosition = useCallback(() => {
     const el = elementRef.current;
@@ -177,238 +252,69 @@ export function usePinyinIME<T extends HTMLInputElement | HTMLTextAreaElement>(
   }, []);
 
   useEffect(() => {
-    if (pinyinInput) {
-      const { candidates: cands } = getCandidates(pinyinInput);
-      setCandidates(cands);
-      setPage(0);
-      updatePosition();
-      window.addEventListener("resize", updatePosition);
-      window.addEventListener("scroll", updatePosition, true);
-    } else {
-      setCandidates([]);
+    if (!snap.hasActiveComposition) {
       setPosition(null);
+      return;
     }
-
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     return () => {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [pinyinInput, updatePosition]);
+  }, [snap.hasActiveComposition, snap.pinyinInput, updatePosition]);
 
-  const insertText = useCallback(
-    (text: string) => {
-      const el = elementRef.current;
-      if (!el) return;
-
-      const start = el.selectionStart ?? 0;
-      const end = el.selectionEnd ?? start;
-      const currentVal = String(value || "");
-      const newValue =
-        currentVal.substring(0, start) + text + currentVal.substring(end);
-
-      onChange?.(newValue);
-
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = start + text.length;
-        el.focus();
-      });
+  const handleKeyDown = useCallback<React.KeyboardEventHandler<T>>(
+    (e: React.KeyboardEvent<T>) => {
+      controllerRef.current?.handleKeyDown(e.nativeEvent);
     },
-    [value, onChange]
-  );
-
-  const selectCandidate = useCallback(
-    (item: CandidateItem) => {
-      insertText(item.word);
-      const len = computeMatchedLength(
-        item.word,
-        pinyinInput,
-        item.matchedLength
-      );
-      const remaining = pinyinInput.substring(len);
-      const nextInput = remaining.startsWith("'")
-        ? remaining.substring(1)
-        : remaining;
-      setPinyinInput(nextInput);
-      setPinyinCursorPosition(nextInput.length);
-    },
-    [insertText, pinyinInput]
+    []
   );
 
   const handleBeforeInput = useCallback<React.FormEventHandler<T>>(
-    (e) => {
-      if (!enabled) return;
-      const ni = e.nativeEvent as InputEvent;
-      if (
-        ni.inputType === "insertFromPaste" ||
-        ni.inputType === "insertFromDrop"
-      ) {
-        return;
-      }
-      if (
-        ni.inputType === "insertCompositionText" ||
-        ni.inputType === "insertFromComposition"
-      ) {
-        return;
-      }
-      if (ni.inputType !== "insertText" || !ni.data) return;
-      if (ni.data.length !== 1) return;
-      const d = ni.data;
-      if (pinyinInput.length > 0) {
-        if (d === " ") {
-          e.preventDefault();
-          return;
-        }
-        if (isDigitSelectKey(d, pageSize)) {
-          e.preventDefault();
-          return;
-        }
-        if (/^[=\-.,]$/.test(d)) {
-          e.preventDefault();
-          return;
-        }
-      }
-      if (/^[a-zA-Z']$/.test(d)) {
-        e.preventDefault();
+    (e: React.FormEvent<T>) => {
+      controllerRef.current?.handleBeforeInput(e.nativeEvent as InputEvent);
+    },
+    []
+  );
+
+  const selectCandidate = useCallback((item: CandidateItem) => {
+    controllerRef.current?.selectCandidate(item);
+  }, []);
+
+  const setPage = useCallback<React.Dispatch<React.SetStateAction<number>>>(
+    (action: React.SetStateAction<number>) => {
+      const c = controllerRef.current;
+      if (!c) return;
+      if (typeof action === "function") {
+        c.setPage((p: number) => action(p));
+      } else {
+        c.setPage(() => action);
       }
     },
-    [enabled, pinyinInput.length, pageSize]
+    []
   );
 
-  const handleKeyDown = useCallback<React.KeyboardEventHandler<T>>(
-    (e) => {
-      if (!enabled) {
-        onKeyDown?.(e);
-        return;
-      }
-
-      if (pinyinInput.length > 0 && isPagingOrControlSymbolKey(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-
-      if (pinyinInput.length > 0) {
-        if (e.key === "Backspace") {
-          e.preventDefault();
-          if (pinyinCursorPosition > 0) {
-            const before = pinyinInput.substring(0, pinyinCursorPosition - 1);
-            const after = pinyinInput.substring(pinyinCursorPosition);
-            setPinyinInput(before + after);
-            setPinyinCursorPosition(pinyinCursorPosition - 1);
-          }
-          return;
-        }
-
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          setPinyinCursorPosition((p) => (p > 0 ? p - 1 : pinyinInput.length));
-          return;
-        }
-
-        if (e.key === "ArrowRight") {
-          e.preventDefault();
-          setPinyinCursorPosition((p) => (p < pinyinInput.length ? p + 1 : 0));
-          return;
-        }
-
-        if (e.key === "Enter") {
-          e.preventDefault();
-          insertText(pinyinInput);
-          setPinyinInput("");
-          setPinyinCursorPosition(0);
-          return;
-        }
-
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setPinyinInput("");
-          setPinyinCursorPosition(0);
-          return;
-        }
-
-        if (e.key === " " || e.key === "Spacebar") {
-          e.preventDefault();
-          if (candidates.length > 0) {
-            selectCandidate(candidates[page * pageSize]);
-          } else {
-            insertText(pinyinInput);
-            setPinyinInput("");
-            setPinyinCursorPosition(0);
-          }
-          return;
-        }
-
-        if (isDigitSelectKey(e.key, pageSize)) {
-          e.preventDefault();
-          const index = parseInt(e.key, 10) - 1;
-          const globalIndex = page * pageSize + index;
-          if (globalIndex < candidates.length) {
-            selectCandidate(candidates[globalIndex]);
-          }
-          return;
-        }
-
-        if (isNextPageKey(e)) {
-          if ((page + 1) * pageSize < candidates.length) {
-            setPage((p) => p + 1);
-          }
-          return;
-        }
-
-        if (isPrevPageKey(e)) {
-          if (page > 0) {
-            setPage((p) => p - 1);
-          }
-          return;
-        }
-      }
-
-      if (/^[a-z']$/i.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        const before = pinyinInput.substring(0, pinyinCursorPosition);
-        const after = pinyinInput.substring(pinyinCursorPosition);
-        setPinyinInput(before + e.key.toLowerCase() + after);
-        setPinyinCursorPosition(pinyinCursorPosition + 1);
-        return;
-      }
-
-      if (pinyinInput.length > 0 && isPagingOrControlSymbolKey(e)) return;
-
-      onKeyDown?.(e);
-    },
-    [
-      enabled,
-      pinyinInput,
-      pinyinCursorPosition,
-      candidates,
-      page,
-      pageSize,
-      insertText,
-      selectCandidate,
-      onKeyDown,
-    ]
-  );
-
-  const displayCandidates = candidates.slice(
-    page * pageSize,
-    (page + 1) * pageSize
-  );
-
-  const showPopup = pinyinInput.length > 0 && position !== null;
+  const showPopup = snap.hasActiveComposition && position !== null;
 
   return {
     elementRef,
-    pinyinInput,
-    pinyinCursorPosition,
-    candidates,
-    displayCandidates,
-    page,
-    pageSize,
+    pinyinInput: snap.pinyinInput,
+    pinyinCursorPosition: snap.pinyinCursorPosition,
+    candidates: snap.candidates,
+    displayCandidates: snap.displayCandidates,
+    page: snap.page,
+    pageSize: snap.pageSize,
     position,
     showPopup,
     selectCandidate,
     setPage,
     handleKeyDown,
     handleBeforeInput,
+    dictionaryLoadState: options?.dictionaryUrl
+      ? dictionaryLoadState
+      : "idle",
+    dictionaryError: options?.dictionaryUrl ? dictionaryError : null,
   };
 }

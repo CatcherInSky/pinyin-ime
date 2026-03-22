@@ -1,17 +1,12 @@
 import * as React from "react";
-import { usePinyinIME } from "./usePinyinIME";
-import { PinyinCandidatePopup } from "./PinyinCandidatePopup";
-import { cn } from "./cn";
+import { PinyinField } from "./pinyin-field";
+import type { PinyinFieldDictionaryProps } from "./pinyin-field";
 import type { PinyinPopupClassNames } from "./types";
 
-const defaultInputClassName =
-  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
-
 /**
- * 单行拼音输入框的可选扩展属性（受控 + 弹窗样式）。
+ * 与 {@link PinyinField} 的 `inputProps` 互斥的顶层字段（由本组件自行绑定）。
  */
-export interface PinyinInputProps
-  extends Omit<React.ComponentPropsWithoutRef<"input">, "onChange"> {
+type PinyinInputOwnProps = {
   /** 文本变化回调（受控） */
   onChange?: (value: string) => void;
   /** 为 `false` 时关闭 IME 逻辑 */
@@ -22,7 +17,18 @@ export interface PinyinInputProps
   classNames?: Partial<PinyinPopupClassNames>;
   /** 候选弹窗 Portal 容器 */
   popupPortalContainer?: HTMLElement | null;
-}
+};
+
+/**
+ * 单行拼音输入框的可选扩展属性（受控 + 弹窗样式 + 词典）。
+ */
+export interface PinyinInputProps
+  extends Omit<
+      React.ComponentPropsWithoutRef<"input">,
+      "onChange" | keyof PinyinInputOwnProps
+    >,
+    PinyinInputOwnProps,
+    PinyinFieldDictionaryProps {}
 
 /**
  * 带浏览器内拼音 IME 的单行输入框，适用于无法使用系统输入法的场景。
@@ -31,74 +37,45 @@ export interface PinyinInputProps
  * @returns 受控 input 与候选弹窗
  */
 export const PinyinInput = React.forwardRef<HTMLInputElement, PinyinInputProps>(
-  (
-    {
+  (props, ref) => {
+    const {
       value,
       onChange,
       onKeyDown,
       className,
-      enabled = true,
+      enabled,
       pageSize,
       classNames,
       popupPortalContainer,
-      ...props
-    },
-    ref
-  ) => {
-    const {
-      elementRef,
-      pinyinInput,
-      pinyinCursorPosition,
-      candidates,
-      displayCandidates,
-      page,
-      pageSize: resolvedPageSize,
-      position,
-      showPopup,
-      selectCandidate,
-      setPage,
-      handleKeyDown,
-      handleBeforeInput,
-    } = usePinyinIME<HTMLInputElement>(value as string, onChange, onKeyDown, {
-      enabled,
-      pageSize,
-    });
+      getEngine,
+      dictionary,
+      dictionaryUrl,
+      dictionaryFetchInit,
+      onDictionaryLoaded,
+      onDictionaryLoadError,
+      ...inputRest
+    } = props;
 
     return (
-      <div className={cn("relative w-full")}>
-        <input
-          {...props}
-          ref={(node) => {
-            (
-              elementRef as React.MutableRefObject<HTMLInputElement | null>
-            ).current = node;
-            if (typeof ref === "function") ref(node);
-            else if (ref)
-              (ref as React.MutableRefObject<HTMLInputElement | null>).current =
-                node;
-          }}
-          className={cn(defaultInputClassName, className)}
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          onBeforeInput={handleBeforeInput}
-          onKeyDownCapture={handleKeyDown}
-        />
-        {showPopup && position && (
-          <PinyinCandidatePopup
-            pinyinInput={pinyinInput}
-            pinyinCursorPosition={pinyinCursorPosition}
-            candidates={candidates}
-            displayCandidates={displayCandidates}
-            page={page}
-            pageSize={resolvedPageSize}
-            position={position}
-            onSelect={selectCandidate}
-            onPageChange={(delta) => setPage((p) => Math.max(0, p + delta))}
-            classNames={classNames}
-            portalContainer={popupPortalContainer}
-          />
-        )}
-      </div>
+      <PinyinField
+        variant="input"
+        ref={ref}
+        value={value as string}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        className={className}
+        enabled={enabled}
+        pageSize={pageSize}
+        classNames={classNames}
+        popupPortalContainer={popupPortalContainer}
+        getEngine={getEngine}
+        dictionary={dictionary}
+        dictionaryUrl={dictionaryUrl}
+        dictionaryFetchInit={dictionaryFetchInit}
+        onDictionaryLoaded={onDictionaryLoaded}
+        onDictionaryLoadError={onDictionaryLoadError}
+        inputProps={inputRest}
+      />
     );
   }
 );

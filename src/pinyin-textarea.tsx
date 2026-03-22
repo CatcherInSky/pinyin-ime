@@ -1,17 +1,12 @@
 import * as React from "react";
-import { usePinyinIME } from "./usePinyinIME";
-import { PinyinCandidatePopup } from "./PinyinCandidatePopup";
-import { cn } from "./cn";
+import { PinyinField } from "./pinyin-field";
+import type { PinyinFieldDictionaryProps } from "./pinyin-field";
 import type { PinyinPopupClassNames } from "./types";
 
-const defaultTextareaClassName =
-  "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
-
 /**
- * 多行拼音输入框的可选扩展属性（受控 + 弹窗样式）。
+ * 与 {@link PinyinField} 的 `textareaProps` 互斥的顶层字段（由本组件自行绑定）。
  */
-export interface PinyinTextareaProps
-  extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange"> {
+type PinyinTextareaOwnProps = {
   /** 文本变化回调（受控） */
   onChange?: (value: string) => void;
   /** 为 `false` 时关闭 IME 逻辑 */
@@ -22,7 +17,18 @@ export interface PinyinTextareaProps
   classNames?: Partial<PinyinPopupClassNames>;
   /** 候选弹窗 Portal 容器 */
   popupPortalContainer?: HTMLElement | null;
-}
+};
+
+/**
+ * 多行拼音输入框的可选扩展属性（受控 + 弹窗样式 + 词典）。
+ */
+export interface PinyinTextareaProps
+  extends Omit<
+      React.ComponentPropsWithoutRef<"textarea">,
+      "onChange" | keyof PinyinTextareaOwnProps
+    >,
+    PinyinTextareaOwnProps,
+    PinyinFieldDictionaryProps {}
 
 /**
  * 带浏览器内拼音 IME 的多行文本框。
@@ -33,80 +39,46 @@ export interface PinyinTextareaProps
 export const PinyinTextarea = React.forwardRef<
   HTMLTextAreaElement,
   PinyinTextareaProps
->(
-  (
-    {
-      value,
-      onChange,
-      onKeyDown,
-      className,
-      enabled = true,
-      pageSize,
-      classNames,
-      popupPortalContainer,
-      ...props
-    },
-    ref
-  ) => {
-    const {
-      elementRef,
-      pinyinInput,
-      pinyinCursorPosition,
-      candidates,
-      displayCandidates,
-      page,
-      pageSize: resolvedPageSize,
-      position,
-      showPopup,
-      selectCandidate,
-      setPage,
-      handleKeyDown,
-      handleBeforeInput,
-    } = usePinyinIME<HTMLTextAreaElement>(
-      value as string,
-      onChange,
-      onKeyDown,
-      { enabled, pageSize }
-    );
+>((props, ref) => {
+  const {
+    value,
+    onChange,
+    onKeyDown,
+    className,
+    enabled,
+    pageSize,
+    classNames,
+    popupPortalContainer,
+    getEngine,
+    dictionary,
+    dictionaryUrl,
+    dictionaryFetchInit,
+    onDictionaryLoaded,
+    onDictionaryLoadError,
+    ...textareaRest
+  } = props;
 
-    return (
-      <div className={cn("relative w-full")}>
-        <textarea
-          {...props}
-          ref={(node) => {
-            (
-              elementRef as React.MutableRefObject<HTMLTextAreaElement | null>
-            ).current = node;
-            if (typeof ref === "function") ref(node);
-            else if (ref)
-              (
-                ref as React.MutableRefObject<HTMLTextAreaElement | null>
-              ).current = node;
-          }}
-          className={cn(defaultTextareaClassName, className)}
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          onBeforeInput={handleBeforeInput}
-          onKeyDownCapture={handleKeyDown}
-        />
-        {showPopup && position && (
-          <PinyinCandidatePopup
-            pinyinInput={pinyinInput}
-            pinyinCursorPosition={pinyinCursorPosition}
-            candidates={candidates}
-            displayCandidates={displayCandidates}
-            page={page}
-            pageSize={resolvedPageSize}
-            position={position}
-            onSelect={selectCandidate}
-            onPageChange={(delta) => setPage((p) => Math.max(0, p + delta))}
-            classNames={classNames}
-            portalContainer={popupPortalContainer}
-          />
-        )}
-      </div>
-    );
-  }
-);
+  return (
+    <PinyinField
+      variant="textarea"
+      ref={ref}
+      value={value as string}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      className={className}
+      enabled={enabled}
+      pageSize={pageSize}
+      classNames={classNames}
+      popupPortalContainer={popupPortalContainer}
+      getEngine={getEngine}
+      dictionary={dictionary}
+      dictionaryUrl={dictionaryUrl}
+      dictionaryFetchInit={dictionaryFetchInit}
+      onDictionaryLoaded={onDictionaryLoaded}
+      onDictionaryLoadError={onDictionaryLoadError}
+      textareaProps={textareaRest}
+    />
+  );
+});
 
 PinyinTextarea.displayName = "PinyinTextarea";

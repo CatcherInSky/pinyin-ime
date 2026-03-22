@@ -1,25 +1,22 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { cn } from "./cn";
-import type { PopupPosition } from "./usePinyinIME";
-import type { CandidateItem } from "./pinyin";
+import { joinClassNames } from "./classnames";
+import type { PopupPosition } from "./types";
+import type { CandidateItem } from "./pinyin-engine";
 import type { PinyinPopupClassNames } from "./types";
 
-/** 内置默认样式（Tailwind + shadcn 语义色，需在项目中配置 CSS 变量） */
+/**
+ * 内置默认样式类名（需引入 `pinyin-ime/pinyin-ime.css` 或自行覆盖 `classNames`）。
+ */
 export const defaultPinyinPopupClassNames: Required<PinyinPopupClassNames> = {
-  popup:
-    "fixed z-[9999] flex flex-col rounded-md border border-border bg-popover p-0.5 text-xs text-popover-foreground shadow-md",
-  pinyinBar:
-    "mb-0.5 shrink-0 border-b border-border bg-muted/80 px-1 py-0.5 font-mono text-[10px]",
-  cursor: "inline-block h-3 w-px animate-pulse bg-primary align-middle",
-  candidateRow:
-    "flex shrink-0 cursor-pointer items-center px-1 py-1 hover:bg-accent hover:text-accent-foreground",
-  candidateIndex:
-    "mr-1 w-4 shrink-0 text-xs font-semibold text-muted-foreground",
-  candidateText: "text-[11px]",
-  empty: "px-1 py-0 text-[10px] italic text-muted-foreground",
-  footer:
-    "mt-0.5 flex shrink-0 items-center justify-between border-t border-border px-1 py-1 text-[10px] text-muted-foreground select-none",
+  popup: "pinyin-ime-popup",
+  pinyinBar: "pinyin-ime-pinyin-bar",
+  cursor: "pinyin-ime-cursor",
+  candidateRow: "pinyin-ime-candidate-row",
+  candidateIndex: "pinyin-ime-candidate-index",
+  candidateText: "pinyin-ime-candidate-text",
+  empty: "pinyin-ime-empty",
+  footer: "pinyin-ime-footer",
 };
 
 /** PinyinCandidatePopup 组件属性 */
@@ -74,7 +71,7 @@ export const PinyinCandidatePopup: React.FC<PinyinCandidatePopupProps> = ({
 
   const popup = (
     <div
-      className={cn(c.popup)}
+      className={joinClassNames(c.popup)}
       style={{
         top: position.top,
         left: position.left,
@@ -82,43 +79,47 @@ export const PinyinCandidatePopup: React.FC<PinyinCandidatePopupProps> = ({
         transform: "translateY(-100%) translateY(-2px)",
       }}
     >
-      <div className={cn(c.pinyinBar)}>
+      <div className={joinClassNames(c.pinyinBar)}>
         {pinyinInput.substring(0, pinyinCursorPosition)}
-        <span className={cn(c.cursor)} />
+        <span className={joinClassNames(c.cursor)} />
         {pinyinInput.substring(pinyinCursorPosition)}
       </div>
 
-      <div className="flex shrink-0 flex-col">
+      <div className="pinyin-ime-candidate-list">
         {displayCandidates.length > 0 ? (
           displayCandidates.map((item, idx) => {
             const globalIdx = page * pageSize + idx;
             return (
               <div
                 key={globalIdx}
-                className={cn(c.candidateRow)}
+                className={joinClassNames(c.candidateRow)}
+                role="option"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onSelect(item);
                 }}
               >
-                <span className={cn(c.candidateIndex)}>{idx + 1}.</span>
-                <span className={cn(c.candidateText)}>{item.word}</span>
+                <span className={joinClassNames(c.candidateIndex)}>
+                  {idx + 1}.
+                </span>
+                <span className={joinClassNames(c.candidateText)}>
+                  {item.word}
+                </span>
               </div>
             );
           })
         ) : (
-          <div className={cn(c.empty)}>无候选词</div>
+          <div className={joinClassNames(c.empty)}>无候选词</div>
         )}
       </div>
 
       {candidates.length > pageSize && (
-        <div className={cn(c.footer)}>
-          <div className="flex gap-2">
+        <div className={joinClassNames(c.footer)}>
+          <div className="pinyin-ime-footer-nav">
             <span
-              className={cn(
-                hasPrev
-                  ? "cursor-pointer hover:text-foreground"
-                  : "cursor-default opacity-50"
+              className={joinClassNames(
+                "pinyin-ime-page-link",
+                !hasPrev && "pinyin-ime-page-link--disabled"
               )}
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -128,10 +129,9 @@ export const PinyinCandidatePopup: React.FC<PinyinCandidatePopupProps> = ({
               &lt; (-)
             </span>
             <span
-              className={cn(
-                hasNext
-                  ? "cursor-pointer hover:text-foreground"
-                  : "cursor-default opacity-50"
+              className={joinClassNames(
+                "pinyin-ime-page-link",
+                !hasNext && "pinyin-ime-page-link--disabled"
               )}
               onMouseDown={(e) => {
                 e.preventDefault();

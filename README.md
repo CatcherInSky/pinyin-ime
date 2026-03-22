@@ -1,30 +1,46 @@
 # pinyin-ime
 
-适用于**无法使用系统输入法**的场景（全屏游戏、内嵌 WebView、远程桌面、部分浏览器环境等）：在 React 受控 `<input />` / `<textarea />` 上用 **a–z 输入拼音**，通过候选框**选词上屏**。
+## 0. 简介
 
-- **在线演示**（需先在仓库 Settings → Pages 中启用 GitHub Pages，并将来源设为 GitHub Actions）：`https://<你的用户名>.github.io/pinyin-ime/`（若 GitHub 仓库目录名不同，请将 `site/vite.config.ts` 里的 `base` 改成与仓库名一致的路径，例如 `/你的仓库名/`）
-- **包名**：[`pinyin-ime`](https://www.npmjs.com/search?q=pinyin-ime)（若已被占用，请改用作用域包如 `@your-org/pinyin-ime` 并相应修改 `package.json` 的 `name`）
+**pinyin-ime** 是一套在浏览器内实现的 **拼音 → 汉字** 输入法能力：在无法使用系统输入法的场景（全屏游戏、内嵌 WebView、远程桌面、部分浏览器环境等），于 `<input>` / `<textarea>` 上用 **a–z** 输入拼音，通过 **候选框选词上屏**。
 
-## 安装
+- **React**：提供 `PinyinField`、`PinyinInput`、`PinyinTextarea` 与 `usePinyinIME` 等 API。  
+- **任意框架 / 无框架**：可通过子路径 **`pinyin-ime/element`** 使用 Lit 实现的 **`<pinyin-ime-editor>`** 自定义元素（`lit` 已打入该入口，无需单独安装）。  
+- **Vue**：无官方 Vue 组件；推荐在模板中直接使用 `<pinyin-ime-editor>`，并在构建工具中将该标签识别为自定义元素（示例见本仓库 [`site/`](site/)）。
+
+在线演示：将 [`site/vite.config.ts`](site/vite.config.ts) 的 `base` 与部署路径对齐后，可由 GitHub Pages 等托管 `site/dist`。
+
+---
+
+## 1. 安装与使用
 
 ```bash
-npm install pinyin-ime
+pnpm add pinyin-ime
+# 或 npm install pinyin-ime / yarn add pinyin-ime
 ```
 
-对等依赖：`react`、`react-dom`（建议 18+）。
+**对等依赖**：主入口 `pinyin-ime` 声明 `react`、`react-dom`（建议 18+）。若项目 **仅** 使用 `pinyin-ime/element` 与样式子路径、不装 React，安装器可能对 peer 给出警告，可按包管理器文档选择忽略或配置（例如 pnpm 的 `peerDependencyRules`）。
 
-默认样式使用 **Tailwind CSS** 与 **shadcn/ui** 常见语义 token（`border-input`、`bg-popover` 等）。若项目中没有这些变量，请配置与 shadcn 一致的 CSS 变量，或通过 `className` / `classNames` 完全自定义。
+**构建产物**：发布包以 `dist/` 下的 **编译后 ESM + `.d.ts`** 为主；使用前请在本仓库根目录执行 `pnpm run build`，保证 `dist` 存在（`pnpm run site:dev` 会先 build 再启 demo）。
 
-## 用法
+### 1.1 React
+
+入口安装样式（与组件配套使用）：
+
+```ts
+import "pinyin-ime/pinyin-ime.css";
+```
+
+**`PinyinInput` / `PinyinTextarea`**（单行 / 多行，API 与原生控件接近）：
 
 ```tsx
 import { useState } from "react";
 import { PinyinInput, PinyinTextarea } from "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
 
-function Form() {
+export function Demo() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-
   return (
     <>
       <PinyinInput value={title} onChange={setTitle} placeholder="标题" />
@@ -34,70 +50,201 @@ function Form() {
 }
 ```
 
-### 与 shadcn `Input` 对齐样式
-
-把 shadcn 文档里 `Input` 的 `className` 原样传给 `PinyinInput` 的 `className` 即可覆盖包内默认 input 样式；候选框可用 `classNames` 分段覆盖：
+**`PinyinField`**（推荐）：用 `variant="input" | "textarea"` 切换宿主，其余原生属性放进 `inputProps` / `textareaProps`，避免与 IME 内部绑定的属性冲突。
 
 ```tsx
-<PinyinInput
-  value={v}
-  onChange={setV}
-  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-  classNames={{
-    popup: "rounded-lg border bg-popover shadow-md",
-    pinyinBar: "font-mono text-xs",
-  }}
-/>
+import { PinyinField } from "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+<PinyinField
+  variant="textarea"
+  value={body}
+  onChange={setBody}
+  textareaProps={{ id: "body", placeholder: "正文", rows: 6 }}
+/>;
 ```
 
-也可从包中导入 `defaultPinyinPopupClassNames` 做合并，或拷贝到本地组件库再改。
+### 1.2 Vue 3
 
-### API 摘要
+本包不提供 `.vue` 单文件组件。做法是：
 
-| 属性 | 说明 |
-|------|------|
-| `value` / `onChange(value)` | 受控字符串（与普通 input 一致，但 `onChange` 为 `(string) => void`） |
-| `enabled` | 默认 `true`；`false` 时不启用 IME，行为等同普通受控输入 |
-| `pageSize` | 每页候选数，默认 `3`，最大 `9`（对应数字键 `1`–`n`） |
-| `classNames` | 候选弹窗分区 class，见类型 `PinyinPopupClassNames` |
-| `popupPortalContainer` | Portal 挂载节点，默认 `document.body` |
+1. 安装依赖并 **build 本库**（workspace 或从 npm 安装已发布版本）。  
+2. 在入口引入 **`import "pinyin-ime/element"`** 与 **`import "pinyin-ime/pinyin-ime.css"`**。  
+3. 在模板里写 **`<pinyin-ime-editor>`**，监听 **`pinyin-ime-change`**，`event.detail.value` 为字符串。  
+4. 使用 **Vite** 时，在 `@vitejs/plugin-vue` 中配置 **`compilerOptions.isCustomElement`**，例如 `(tag) => tag === "pinyin-ime-editor"`，避免 Vue 把未知标签当普通组件解析。
 
-高级用法可直接使用 **`usePinyinIME`**、**`PinyinCandidatePopup`**、**`getCandidates`** / **`computeMatchedLength`** 自建 UI（见包内导出）。
+完整可运行示例见 **[`site/src/VueWcDemo.vue`](site/src/VueWcDemo.vue)** 与 **[`site/vite.config.ts`](site/vite.config.ts)**。
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import "pinyin-ime/element";
+import "pinyin-ime/pinyin-ime.css";
+
+const text = ref("");
+function onPinyinChange(e: Event) {
+  text.value = (e as CustomEvent<{ value: string }>).detail.value;
+}
+</script>
+
+<template>
+  <pinyin-ime-editor :value="text" @pinyin-ime-change="onPinyinChange" />
+</template>
+```
+
+### 1.3 原生 Web Component
+
+在支持 **ESM** 的页面或应用中：
+
+```html
+<script type="module">
+  import "pinyin-ime/element";
+  import "pinyin-ime/pinyin-ime.css";
+</script>
+```
+
+注册完成后可用 HTML / DOM API 使用 **`<pinyin-ime-editor>`**：
+
+```js
+const el = document.createElement("pinyin-ime-editor");
+el.addEventListener("pinyin-ime-change", (e) => {
+  console.log(e.detail.value);
+});
+document.body.append(el);
+```
+
+与 **React 并列挂载**、**动态 import** 的演示见 **[`site/src/App.tsx`](site/src/App.tsx)** 中的 `NativeWcDemo`。
+
+---
+
+## 2. Props / 属性说明
+
+### 2.1 React：`PinyinField`
+
+`PinyinInput` / `PinyinTextarea` 的 IME 相关 props 与下表一致；差别在于：二者把 **原生 `input` / `textarea` 属性** 直接铺在根上（仍不含被 IME 占用的键），而 `PinyinField` 通过 **`inputProps` / `textareaProps`** 透传。
+
+以下 **不可** 出现在 `inputProps` / `textareaProps` 中：`value`、`onChange`、`onBeforeInput`、`onKeyDownCapture`、`ref`（由组件接管）。类型见 **`PinyinFieldNativeInputProps`** / **`PinyinFieldNativeTextareaProps`**。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `value` | `string` | — | 受控文本 |
+| `onChange` | `(value: string) => void` | — | 文本变化 |
+| `onKeyDown` | `KeyboardEventHandler<HTMLInputElement \| HTMLTextAreaElement>` | — | 未被 IME 拦截时的键盘回调 |
+| `variant` | `"input" \| "textarea"` | `"input"` | 宿主类型（仅 `PinyinField`） |
+| `enabled` | `boolean` | `true` | `false` 时关闭 IME，行为等同普通受控输入 |
+| `pageSize` | `number` | `3` | 每页候选数，范围 1–9（对应数字键 1–n） |
+| `classNames` | `Partial<PinyinPopupClassNames>` | — | 候选弹窗各区域 `className` |
+| `popupPortalContainer` | `HTMLElement \| null` | `document.body` | 候选层 Portal 挂载节点 |
+| `className` | `string` | — | 外层包裹元素 `className` |
+| `inputProps` | `PinyinFieldNativeInputProps` | — | 仅 `variant="input"` 时合并到 `<input>` |
+| `textareaProps` | `PinyinFieldNativeTextareaProps` | — | 仅 `variant="textarea"` 时合并到 `<textarea>` |
+| `getEngine` | `() => PinyinEngine \| null` | — | **词典优先级最高**：自定义引擎实例 |
+| `dictionary` | `GooglePinyinDict` | — | 内存中的整本词典对象 |
+| `dictionaryUrl` | `string` | — | 远程词典 JSON 的 URL（需 CORS）；加载完成前候选为空 |
+| `dictionaryFetchInit` | `RequestInit` | — | 传给 `fetch(dictionaryUrl, init)` |
+| `onDictionaryLoaded` | `() => void` | — | 远程词典加载成功并创建引擎后调用 |
+| `onDictionaryLoadError` | `(error: unknown) => void` | — | 远程加载或解析失败时调用 |
+
+### 2.2 `usePinyinIME` 的选项与返回值（进阶）
+
+除组件外可直接使用 **`usePinyinIME(value, onChange, onKeyDown, options)`**。其中 **`options`** 的字段与上表中的 `enabled`、`pageSize`、`getEngine`、`dictionary`、`dictionaryUrl`、`dictionaryFetchInit`、`onDictionaryLoaded`、`onDictionaryLoadError` 相同。
+
+返回值中常用字段：`elementRef`、`pinyinInput`、`candidates`、`displayCandidates`、`page`、`pageSize`、`position`、`showPopup`、`selectCandidate`、`setPage`、`handleKeyDown`、`handleBeforeInput`；若使用 `dictionaryUrl`，另有 **`dictionaryLoadState`**（`"idle" \| "loading" \| "ready" \| "error"`）、**`dictionaryError`**。
+
+### 2.3 自定义元素：`<pinyin-ime-editor>`
+
+属性名为 **DOM 中的写法**（Lit 会将 camelCase 映射为 attribute）。
+
+| 属性（HTML） | 类型 | 默认值 | 说明 |
+|--------------|------|--------|------|
+| `value` | `string` | `""` | 受控文本（property） |
+| `variant` | `"input" \| "textarea"` | `"input"` | 单行或多行宿主 |
+| `dictionary-url` | `string` | `""` | 非空时从该 URL 拉取词典 JSON |
+| `enabled` | `boolean` | `true` | 是否启用 IME 逻辑 |
+| `page-size` | `number` | `3` | 每页候选数（1–9） |
+
+| 事件 | `detail` | 说明 |
+|------|-----------|------|
+| `pinyin-ime-change` | `{ value: string }` | 文本变化（选词、上屏、普通输入等导致 `value` 更新时） |
+
+---
+
+## 3. 样式
+
+### 3.1 默认样式怎么用
+
+在应用入口（或懒加载 IME 的 chunk 入口）增加：
+
+```ts
+import "pinyin-ime/pinyin-ime.css";
+```
+
+样式使用 **`pinyin-ime-*`** 类名（输入框、候选条、分页区等）。**不引入该文件** 时，组件仍可运行，但默认外观会缺失，需自行用下文方式补全。
+
+### 3.2 怎么自定义
+
+1. **React 宿主**：根级 **`className`**（或 `inputProps.className` / `textareaProps.className`）覆盖输入框；**`classNames`** 覆盖弹窗分区，键名见类型 **`PinyinPopupClassNames`**（`popup`、`pinyinBar`、`cursor`、`candidateRow` 等）。可与 **`defaultPinyinPopupClassNames`** 合并后再覆盖局部。  
+2. **自建弹窗**：使用 **`usePinyinIME`** + **`PinyinCandidatePopup`**（或完全自建 UI），只消费 hook 返回的状态与事件。  
+3. **Web Component**：样式在 **Shadow DOM** 内联，默认已包含与 `pinyin-ime.css` 等价的一套规则；宿主页面再引 `pinyin-ime.css` 主要影响 **document 内** 其它元素，一般仍需依赖内置样式或通过 **继承 / 未来主题 API** 扩展（当前版本以内联为主）。
+
+工具函数 **`joinClassNames`** 可用于拼接 `className` 字符串（无 Tailwind 依赖）。
+
+---
+
+## 4. 字典与懒加载
+
+### 4.1 默认行为
+
+未配置 `getEngine` / `dictionary` / `dictionaryUrl` 时，使用包内 **同步内嵌** 的默认词典（体积较大，安装包可达数 MB 量级）。
+
+### 4.2 懒加载（远程 URL）
+
+设置 **`dictionaryUrl`**（React 组件或 `usePinyinIME` / 自定义元素的 **`dictionary-url`**）后：
+
+- 会在客户端 **`fetch(url)`** 拉取 JSON； body 须为与 **`GooglePinyinDict`** 同形的对象：`Record<string, Array<{ w: string; f: number }>>`。  
+- **加载完成前** 引擎为空，**候选列表为空**（不会回退到内嵌大词典，除非你自己在 `getEngine` 里组合逻辑）。  
+- 服务端需配置 **CORS**，生产环境建议 **版本化 URL** 与合理 **`Cache-Control`**。  
+- 可选 **`dictionaryFetchInit`** 传入 `fetch` 的第二参数；**`onDictionaryLoaded` / `onDictionaryLoadError`** 做提示或埋点。  
+- React 下可通过 **`dictionaryLoadState`**、**`dictionaryError`** 展示加载态与错误。
+
+### 4.3 其它方式
+
+- **`dictionary`**：已解析的对象，适合小表或与打包器拆分的 JSON 模块。  
+- **`getEngine()`**：返回 **`createPinyinEngine(dict)`** 的实例，优先级最高，可实现缓存、多源合并等。
+
+---
 
 ## 快捷键
 
-- **a–z**：写入拼音缓冲（`'` 用于音节分隔，与引擎一致）
-- **空格**：选第一个候选；若无候选则上屏当前拼音串
-- **1–n**：选择当前页第 n 个候选（n ≤ `pageSize`）
-- **= / . / 小键盘 +**：下一页；**- / , / 小键盘 -**：上一页
-- **← / →**：在拼音串内移动光标
-- **Enter**：上屏拼音串；**Escape**：清空缓冲
+- **a–z**：写入拼音缓冲（`'` 音节分隔）  
+- **空格**：选第一候选；无候选则上屏当前拼音串  
+- **1–n**：选择当前页第 n 个候选（n ≤ `pageSize`）  
+- **= / . / 小键盘 +**：下一页；**- / , / 小键盘 -**：上一页  
+- **← / →**：在拼音串内移动光标  
+- **Enter**：上屏拼音串；**Escape**：清空缓冲  
 
-## 本地开发与发布
+---
 
-```bash
-npm install
-npm run build          # 产出 dist/（发布到 npm）
-npm run site:dev       # 先 build 库，再启动示例站（Vite）
-npm run site:build     # 构建 site/dist，供 GitHub Pages 上传
-```
-
-示例站源码在 **`site/`** 目录（构建产物 `site/dist`）。若你的工作区忽略了名为 `demo` 的目录，本仓库使用 `site` 作为示例应用路径，与计划中的「demo 页」等价。
-
-将本目录作为独立 Git 仓库时，在 GitHub 仓库 **Settings → Pages** 中选择 **GitHub Actions** 作为来源；推送 `main` 分支会由 [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml) 部署。
-
-发布前：
+## 本地开发与演示站
 
 ```bash
-npm pack --dry-run
+pnpm install
+pnpm run test
+pnpm run build              # 生成根目录 dist/（npm 发布内容）
+pnpm run site:dev           # 先 build 库，再启动 site（含 React + Vue + WC 示例）
+pnpm run site:build         # 构建 site/dist
 ```
 
-确认 `files` 仅包含 `dist`、`README.md`、`LICENSE` 等预期文件。
+发布前可使用 `pnpm pack` / `npm pack --dry-run` 检查打包包容。
 
-## 第三方数据
+---
 
-拼音词表衍生自开源项目 [web-pinyin-ime](https://github.com/dongyuwei/web-pinyin-ime) 中的 Google 拼音风格字典数据；使用前请自行评估许可与合规要求。生成方式可与主项目脚本类似：从该仓库导出 `dict` 对象为 TypeScript 模块（见本包 `src/google_pinyin_dict.ts`）。
+## 第三方数据与合规
 
-## 包体积说明
+拼音词表衍生自 [web-pinyin-ime](https://github.com/dongyuwei/web-pinyin-ime) 等开源数据；使用与再分发前请自行评估许可与合规要求。
 
-字典体积较大，安装后包体可达数 MB 量级。若需极致按需加载，可在上层用动态 `import()` 或拆包策略自行封装（本包当前为同步打包）。
+---
+
+## SSR 与客户端
+
+IME 使用 Portal、`window` 监听与选区 API，**仅适用于客户端**。在 Next.js 等环境中请对含 IME 的界面使用 **`dynamic(..., { ssr: false })`** 或等价方式。

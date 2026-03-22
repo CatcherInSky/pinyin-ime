@@ -1,7 +1,7 @@
 {
   "name": "pinyin-ime",
-  "version": "0.1.0",
-  "description": "React pinyin-to-Chinese IME for environments without a system input method (games, WebView, remote desktop).",
+  "version": "0.2.0",
+  "description": "Pinyin-to-Chinese IME for React and Web Components (Lit), for environments without a system input method.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -10,16 +10,26 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./element": {
+      "import": "./dist/element.js",
+      "types": "./dist/element.d.ts"
+    },
+    "./pinyin-ime.css": "./dist/pinyin-ime.css"
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/pinyin-ime.css"
+  ],
   "scripts": {
+    "prebuild": "node scripts/embed-css.mjs",
     "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build",
     "site:dev": "pnpm run build && pnpm --filter pinyin-ime-site dev",
     "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build"
@@ -31,26 +41,39 @@
     "input",
     "chinese",
     "input-method",
-    "shadcn"
+    "web-components",
+    "lit"
   ],
   "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhang/pinyin-ime.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhang/pinyin-ime/issues"
+  },
+  "homepage": "https://github.com/zhang/pinyin-ime#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "peerDependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
-  "dependencies": {
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^3.4.0"
-  },
   "devDependencies": {
+    "@testing-library/react": "^16.2.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^26.0.0",
+    "lit": "^3.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tsup": "^8.3.5",
     "typescript": "^5.3.3",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^3.0.5"
   },
   "workspaces": ["site"]
 }
