@@ -5,20 +5,8 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,12 +24,15 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          pnpm install
+          pnpm install --frozen-lockfile
           pnpm run site:build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to CatcherInSky.github.io/pinyin-ime
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: site/dist
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          personal_token: ${{ secrets.GH_IO_TOKEN }}
+          external_repository: CatcherInSky/CatcherInSky.github.io
+          publish_branch: main
+          publish_dir: site/dist
+          destination_dir: pinyin-ime
+          keep_files: true
