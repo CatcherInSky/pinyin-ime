@@ -32,7 +32,7 @@ jobs:
         with:
           personal_token: ${{ secrets.GH_IO_TOKEN }}
           external_repository: CatcherInSky/CatcherInSky.github.io
-          publish_branch: main
+          publish_branch: master
           publish_dir: site/dist
           destination_dir: pinyin-ime
           keep_files: true
