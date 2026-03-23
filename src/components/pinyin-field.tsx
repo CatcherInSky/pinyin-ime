@@ -1,9 +1,9 @@
 import * as React from "react";
-import { usePinyinIME } from "./usePinyinIME";
-import type { UsePinyinIMEOptions } from "./usePinyinIME";
+import { usePinyinIME } from "../hooks/usePinyinIME";
+import type { UsePinyinIMEOptions } from "../hooks/usePinyinIME";
 import { PinyinCandidatePopup } from "./PinyinCandidatePopup";
-import { joinClassNames } from "./classnames";
-import type { PinyinPopupClassNames } from "./types";
+import { joinClassNames } from "../lib/classnames";
+import type { PinyinPopupClassNames } from "../lib/types";
 
 /**
  * 与 IME 内部绑定的属性名；不可通过 `inputProps` / `textareaProps` 覆盖。

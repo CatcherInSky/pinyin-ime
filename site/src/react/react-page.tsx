@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { PinyinInput, PinyinTextarea } from "pinyin-ime"; // todo 修改统一
+import "pinyin-ime";
 import { getDemoRoutes } from "../common/demo-routes";
 import "pinyin-ime/pinyin-ime.css";
 import "../common/index.css";
@@ -15,8 +15,55 @@ const SHORTCUT_LINES = [
   "Enter：上屏拼音；Escape：清空缓冲",
 ] as const;
 
+/** Lit 宿主上的受控 `value` 与自定义事件。 */
+type PinyinHostEl = HTMLElement & { value: string };
+
 /**
- * React 演示页：从主包命名导入 `PinyinInput` / `PinyinTextarea`，受控展示单行与多行。
+ * 在 React 中受控使用 `<pinyin-ime-editor>`：同步 `value` 并转发 `pinyin-ime-change`。
+ *
+ * @param props - 受控值、回调与可选 `variant`
+ * @returns JSX
+ */
+function PinyinImeEditorCtl(props: {
+  value: string;
+  onValueChange: (v: string) => void;
+  variant?: "input" | "textarea";
+  className?: string;
+}) {
+  const { value, onValueChange, variant, className } = props;
+  const ref = useRef<PinyinHostEl | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    /**
+     * @param e - `pinyin-ime` 自定义事件
+     */
+    const handler = (e: Event) => {
+      onValueChange((e as CustomEvent<{ value: string }>).detail.value);
+    };
+    el.addEventListener("pinyin-ime-change", handler);
+    return () => el.removeEventListener("pinyin-ime-change", handler);
+  }, [onValueChange]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && el.value !== value) {
+      el.value = value;
+    }
+  }, [value]);
+
+  return (
+    <pinyin-ime-editor
+      ref={ref}
+      className={className}
+      variant={variant}
+    />
+  );
+}
+
+/**
+ * React 演示页：侧载 `import "pinyin-ime"` 注册 `<pinyin-ime-editor>`，受控展示单行与多行。
  *
  * @returns 页面 JSX
  */
@@ -56,24 +103,30 @@ function ReactDemoPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           使用{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            import &#123; PinyinInput, PinyinTextarea &#125; from &quot;pinyin-ime&quot;
+            import &quot;pinyin-ime&quot;
+          </code>{" "}
+          注册自定义元素，模板中渲染{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            &lt;pinyin-ime-editor&gt;
           </code>
           ，并引入{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">pinyin-ime/pinyin-ime.css</code>
-          ；主包无默认导出，Web Component 类在{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">pinyin-ime/element</code>（
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">PinyinIMEEditor</code>
-          ）。
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            pinyin-ime/pinyin-ime.css
+          </code>
+          ；类型导出可选{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            PinyinIMEEditor
+          </code>
+          。
         </p>
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">单行（PinyinInput）</h2>
-        <PinyinInput
+        <h2 className="text-lg font-semibold">单行（默认 input）</h2>
+        <PinyinImeEditorCtl
           className="w-full"
           value={single}
-          onChange={setSingle}
-          placeholder="在此输入拼音…"
+          onValueChange={setSingle}
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(single)}</span>
@@ -81,13 +134,12 @@ function ReactDemoPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">多行（PinyinTextarea）</h2>
-        <PinyinTextarea
+        <h2 className="text-lg font-semibold">多行（variant = &quot;textarea&quot;）</h2>
+        <PinyinImeEditorCtl
           className="w-full"
           value={multi}
-          onChange={setMulti}
-          placeholder="多行输入…"
-          rows={4}
+          onValueChange={setMulti}
+          variant="textarea"
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(multi)}</span>

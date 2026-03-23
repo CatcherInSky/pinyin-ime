@@ -12,16 +12,16 @@ import {
   useLayoutEffect,
   useSyncExternalStore,
 } from "react";
-import type { GooglePinyinDict } from "./google_pinyin_dict";
+import type { GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
 import {
   createPinyinEngine,
   type PinyinEngine,
-} from "./pinyin-engine";
-import { defaultPinyinEngine } from "./pinyin";
-import { loadGooglePinyinDictFromUrl } from "./load-dictionary";
-import type { CandidateItem } from "./pinyin-engine";
-import { PinyinIMEController } from "./pinyin-ime-controller";
-import type { PopupPosition } from "./types";
+} from "../engine/pinyin-engine";
+import { defaultPinyinEngine } from "../engine/pinyin";
+import { loadGooglePinyinDictFromUrl } from "../dictionary/load-dictionary";
+import type { CandidateItem } from "../engine/pinyin-engine";
+import { PinyinIMEController } from "../ime/pinyin-ime-controller";
+import type { PopupPosition } from "../lib/types";
 
 /** 默认每页候选数量（与数字键 1–3 的原始设计一致） */
 export const PAGE_SIZE = 3;

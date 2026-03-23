@@ -3,7 +3,7 @@ import {
   loadGooglePinyinDictFromUrl,
   assertGooglePinyinDictShape,
   DictionaryLoadError,
-} from "./load-dictionary";
+} from "../src/dictionary/load-dictionary";
 
 describe("assertGooglePinyinDictShape", () => {
   it("accepts a valid minimal dict", () => {

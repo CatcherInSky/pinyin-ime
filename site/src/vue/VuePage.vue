@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { getDemoRoutes } from "../common/demo-routes";
-import "pinyin-ime/element";
+import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
 const r = getDemoRoutes();

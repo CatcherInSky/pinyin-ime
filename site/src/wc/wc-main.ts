@@ -1,5 +1,5 @@
 import "../common/index.css";
-import "pinyin-ime/element";
+import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 import { getDemoRoutes } from "../common/demo-routes";
 
@@ -82,7 +82,7 @@ function main() {
   const intro = document.createElement("p");
   intro.className = "mt-2 text-sm text-muted-foreground";
   intro.textContent =
-    "引入 pinyin-ime/element 注册自定义元素后，用 document.createElement(\"pinyin-ime-editor\") 挂载；设置 property variant 为 \"textarea\" 使用多行宿主。";
+    "引入 pinyin-ime 注册自定义元素后，用 document.createElement(\"pinyin-ime-editor\") 挂载；设置 property variant 为 \"textarea\" 使用多行宿主。";
   head.appendChild(intro);
   mainEl.appendChild(head);
 

@@ -47,7 +47,7 @@ function renderHub(root: HTMLElement) {
   const ul = document.createElement("ul");
   ul.className = "list-inside list-disc space-y-2 text-sm text-muted-foreground";
   const pages: { href: string; title: string; desc: string }[] = [
-    { href: r.react, title: "React", desc: "PinyinInput / PinyinTextarea" },
+    { href: r.react, title: "React", desc: "JSX 中使用 pinyin-ime-editor" },
     { href: r.vue, title: "Vue 3", desc: "模板中使用 pinyin-ime-editor" },
     { href: r.webComponent, title: "Web Component", desc: "原生 DOM 挂载 pinyin-ime-editor" },
   ];

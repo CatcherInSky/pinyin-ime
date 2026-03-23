@@ -10,4 +10,4 @@ const out = `/**
  */
 export const PINYIN_IME_STYLE_TEXT = ${JSON.stringify(css)};
 `;
-writeFileSync(join(root, "src/pinyin-ime-style-text.ts"), out);
+writeFileSync(join(root, "src/ime/pinyin-ime-style-text.ts"), out);

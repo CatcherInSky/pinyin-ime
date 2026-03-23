@@ -1,9 +1,9 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { joinClassNames } from "./classnames";
-import type { PopupPosition } from "./types";
-import type { CandidateItem } from "./pinyin-engine";
-import type { PinyinPopupClassNames } from "./types";
+import { joinClassNames } from "../lib/classnames";
+import type { PopupPosition } from "../lib/types";
+import type { CandidateItem } from "../engine/pinyin-engine";
+import type { PinyinPopupClassNames } from "../lib/types";
 
 /**
  * 内置默认样式类名（需引入 `pinyin-ime/pinyin-ime.css` 或自行覆盖 `classNames`）。

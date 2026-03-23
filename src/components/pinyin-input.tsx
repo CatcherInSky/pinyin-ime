@@ -1,7 +1,7 @@
 import * as React from "react";
 import { PinyinField } from "./pinyin-field";
 import type { PinyinFieldDictionaryProps } from "./pinyin-field";
-import type { PinyinPopupClassNames } from "./types";
+import type { PinyinPopupClassNames } from "../lib/types";
 
 /**
  * 与 {@link PinyinField} 的 `inputProps` 互斥的顶层字段（由本组件自行绑定）。

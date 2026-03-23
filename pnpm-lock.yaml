@@ -52,7 +52,7 @@ importers:
     dependencies:
       pinyin-ime:
         specifier: npm:pinyin-ime@>=0.2.0
-        version: 0.2.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 0.3.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1258,8 +1258,8 @@ packages:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
     engines: {node: '>=0.10.0'}
 
-  pinyin-ime@0.2.0:
-    resolution: {integrity: sha512-+UpKYtDU3YYY6BansFwkxZu/upVkMT5xp+sFkrizY4mJhrTBtbhWT9izzm9Q40HRKcW3HiFQ7VT88pAsAoVA0A==}
+  pinyin-ime@0.3.0:
+    resolution: {integrity: sha512-TyOwGS/DYDL/J9JMNLEtsUvZcw3xjuEy+1IuAQoQp+JIshB+VBhhmEkq4yd26V3jo72Y6mRZyP3fWlsuF0aNBQ==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.0.0
@@ -2682,7 +2682,7 @@ snapshots:
 
   pify@2.3.0: {}
 
-  pinyin-ime@0.2.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  pinyin-ime@0.3.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)

@@ -10,13 +10,13 @@ import {
   type PropertyValues,
 } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { defaultPinyinEngine, createPinyinEngine } from "./pinyin";
-import { loadGooglePinyinDictFromUrl } from "./load-dictionary";
-import type { PinyinEngine } from "./pinyin-engine";
-import type { CandidateItem } from "./pinyin-engine";
-import { PinyinIMEController } from "./pinyin-ime-controller";
-import type { PopupPosition } from "./types";
-import { PINYIN_IME_STYLE_TEXT } from "./pinyin-ime-style-text";
+import { defaultPinyinEngine, createPinyinEngine } from "./engine/pinyin";
+import { loadGooglePinyinDictFromUrl } from "./dictionary/load-dictionary";
+import type { PinyinEngine } from "./engine/pinyin-engine";
+import type { CandidateItem } from "./engine/pinyin-engine";
+import { PinyinIMEController } from "./ime/pinyin-ime-controller";
+import type { PopupPosition } from "./lib/types";
+import { PINYIN_IME_STYLE_TEXT } from "./ime/pinyin-ime-style-text";
 
 /**
  * 宿主上可监听的事件：`detail.value` 为新的受控文本。
@@ -38,15 +38,15 @@ export class PinyinIMEEditor extends LitElement {
   };
 
   /** 受控文本 */
-  value = "";
+  declare value: string;
   /** `input` 或 `textarea` */
-  variant: "input" | "textarea" = "input";
+  declare variant: "input" | "textarea";
   /** 远程词典 URL（空则使用包内默认引擎） */
-  dictionaryUrl = "";
+  declare dictionaryUrl: string;
   /** 是否启用 IME 拦截 */
-  enabled = true;
+  declare enabled: boolean;
   /** 每页候选数 */
-  pageSize = 3;
+  declare pageSize: number;
 
   private readonly inputRef = createRef<HTMLInputElement | HTMLTextAreaElement>();
 
@@ -61,6 +61,15 @@ export class PinyinIMEEditor extends LitElement {
     this._syncPosition();
     this.requestUpdate();
   };
+
+  constructor() {
+    super();
+    this.value = "";
+    this.variant = "input";
+    this.dictionaryUrl = "";
+    this.enabled = true;
+    this.pageSize = 3;
+  }
 
   /**
    * @returns 当前用于匹配的引擎

@@ -1,6 +1,6 @@
-export { joinClassNames } from "./classnames";
-export type { PinyinPopupClassNames, PopupPosition } from "./types";
-export type { DictEntry, GooglePinyinDict } from "./google_pinyin_dict";
+export { joinClassNames } from "./lib/classnames";
+export type { PinyinPopupClassNames, PopupPosition } from "./lib/types";
+export type { DictEntry, GooglePinyinDict } from "../dictionary/google_pinyin_dict";
 export {
   getCandidates,
   computeMatchedLength,
@@ -12,14 +12,14 @@ export {
   type CandidateItem,
   type PinyinMatchResult,
   type PinyinEngine,
-} from "./pinyin";
+} from "./engine/pinyin";
 export {
   usePinyinIME,
   PAGE_SIZE,
   type UsePinyinIMEReturn,
   type UsePinyinIMEOptions,
   type DictionaryLoadState,
-} from "./usePinyinIME";
+} from "./hooks/usePinyinIME";
 export {
   PinyinIMEController,
   IME_PAGE_SIZE,
@@ -27,12 +27,12 @@ export {
   type PinyinIMEControllerOptions,
   type PinyinIMEControllerSnapshot,
   type PinyinIMEHostAdapter,
-} from "./pinyin-ime-controller";
+} from "./ime/pinyin-ime-controller";
 export {
   PinyinCandidatePopup,
   defaultPinyinPopupClassNames,
   type PinyinCandidatePopupProps,
-} from "./PinyinCandidatePopup";
+} from "./components/PinyinCandidatePopup";
 export {
   PinyinField,
   PINYIN_IME_HOST_RESERVED_KEYS,
@@ -40,6 +40,5 @@ export {
   type PinyinFieldNativeInputProps,
   type PinyinFieldNativeTextareaProps,
   type PinyinFieldDictionaryProps,
-} from "./pinyin-field";
-export { PinyinInput, type PinyinInputProps } from "./pinyin-input";
-export { PinyinTextarea, type PinyinTextareaProps } from "./pinyin-textarea";
+} from "./components/pinyin-field";
+export { PinyinIMEEditor, type PinyinIMEChangeDetail } from "./element";

@@ -6,7 +6,7 @@
  * 高级用法请使用 {@link createPinyinEngine} 注入自定义词典，或
  * {@link loadGooglePinyinDictFromUrl} 远程加载。
  */
-import { dict } from "./google_pinyin_dict";
+import { dict } from "../../dictionary/google_pinyin_dict";
 import { createPinyinEngine } from "./pinyin-engine";
 
 /**
@@ -26,7 +26,7 @@ export {
   loadGooglePinyinDictFromUrl,
   assertGooglePinyinDictShape,
   DictionaryLoadError,
-} from "./load-dictionary";
+} from "../dictionary/load-dictionary";
 
 /**
  * 选词后从输入中应消去的长度（反向拼音匹配）。

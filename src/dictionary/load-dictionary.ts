@@ -3,7 +3,7 @@
  * @description 从 URL 异步加载与 {@link GooglePinyinDict} 同形的 JSON 词典。
  */
 
-import type { DictEntry, GooglePinyinDict } from "./google_pinyin_dict";
+import type { DictEntry, GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
 
 /**
  * 在 {@link loadGooglePinyinDictFromUrl} 失败时抛出，便于调用方区分网络/解析错误。

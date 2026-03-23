@@ -6,8 +6,8 @@ import { describe, it, expect } from "vitest";
 import * as React from "react";
 import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import type { GooglePinyinDict } from "./google_pinyin_dict";
-import { PinyinInput } from "./pinyin-input";
+import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
+import { PinyinInput } from "../src/components/pinyin-input";
 
 const tinyDict: GooglePinyinDict = {
   n: [{ w: "你", f: 10 }],

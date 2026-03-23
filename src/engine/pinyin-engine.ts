@@ -3,7 +3,7 @@
  * @description 可注入字典的拼音匹配引擎（`createPinyinEngine`）。
  */
 
-import type { GooglePinyinDict } from "./google_pinyin_dict";
+import type { GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
 
 /**
  * 单字母前缀递进（ztai → z）时合并词条数上限，避免与「全字典 z*」等长列表拖慢 UI。

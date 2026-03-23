@@ -1,6 +1,6 @@
 {
   "name": "pinyin-ime",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "拼音转汉字输入法能力：在无法使用系统输入法的场景使用，通过候选框选词上屏",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,10 +10,6 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./element": {
-      "import": "./dist/element.js",
-      "types": "./dist/element.d.ts"
     },
     "./pinyin-ime.css": "./dist/pinyin-ime.css",
     "./google-pinyin-dict.json": "./dist/google-pinyin-dict.json"

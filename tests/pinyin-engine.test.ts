@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createPinyinEngine } from "./pinyin-engine";
-import type { GooglePinyinDict } from "./google_pinyin_dict";
+import { createPinyinEngine } from "../src/engine/pinyin-engine";
+import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
 
 const tinyDict: GooglePinyinDict = {
   n: [
