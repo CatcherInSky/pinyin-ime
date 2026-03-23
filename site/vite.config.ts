@@ -43,7 +43,7 @@ export default defineConfig(({ command }) => {
           ],
         }
       : undefined,
-    base: "/pinyin-ime/",
+    base: "/pinyinime/",
     build: {
       rollupOptions: {
         input: {
