@@ -62,6 +62,10 @@ export interface PinyinIMEControllerSnapshot {
   pinyinInput: string;
   /** 缓冲内光标 */
   pinyinCursorPosition: number;
+  /** 选区起点（含） */
+  pinyinSelectionStart: number;
+  /** 选区终点（不含） */
+  pinyinSelectionEnd: number;
   /** 全部候选 */
   candidates: CandidateItem[];
   /** 当前页候选 */
@@ -70,6 +74,8 @@ export interface PinyinIMEControllerSnapshot {
   page: number;
   /** 每页条数 */
   pageSize: number;
+  /** 当前高亮候选（全局索引） */
+  highlightedCandidateIndex: number | null;
   /** 拼音非空时可为 true；是否与弹层同显由宿主结合定位再定 */
   hasActiveComposition: boolean;
 }
@@ -149,9 +155,21 @@ export class PinyinIMEController<
   private listeners = new Set<() => void>();
   private pinyinInput = "";
   private pinyinCursorPosition = 0;
+  private pinyinSelectionStart = 0;
+  private pinyinSelectionEnd = 0;
   private candidates: CandidateItem[] = [];
   private page = 0;
   private pageSize = IME_PAGE_SIZE;
+  private highlightedCandidateIndex: number | null = null;
+  private recomputeRafId: number | null = null;
+  /**
+   * 失配短路锚点：当某个前缀命中候选为空后，后续仅追加字符且仍以该前缀开头时跳过引擎计算。
+   *
+   * @remarks
+   * 这属于「增量检索 + 失配剪枝（negative cache）」：降低长串无效输入时的重复计算成本。
+   * 删除回退到锚点以内或发生选词/提交后会解除该状态。
+   */
+  private missPrefixLock: string | null = null;
 
   /**
    * `useSyncExternalStore` 要求：在状态未变时 {@link PinyinIMEController.getSnapshot} 返回同一引用。
@@ -173,6 +191,7 @@ export class PinyinIMEController<
    * @param patch - 要覆盖的字段
    */
   setOptions(patch: Partial<PinyinIMEControllerOptions<T>>): void {
+    this.cancelScheduledRecompute();
     this.options = { ...this.options, ...patch };
     if (patch.pageSize !== undefined) {
       this.pageSize = clampIMPageSize(patch.pageSize);
@@ -207,34 +226,205 @@ export class PinyinIMEController<
       this.cachedSnapshot = {
         pinyinInput: this.pinyinInput,
         pinyinCursorPosition: this.pinyinCursorPosition,
+        pinyinSelectionStart: this.pinyinSelectionStart,
+        pinyinSelectionEnd: this.pinyinSelectionEnd,
         candidates: this.candidates,
         displayCandidates,
         page: this.page,
         pageSize: this.pageSize,
+        highlightedCandidateIndex: this.highlightedCandidateIndex,
         hasActiveComposition: this.pinyinInput.length > 0,
       };
     }
     return this.cachedSnapshot;
   }
 
+  /**
+   * 触发订阅者更新，并使快照缓存失效。
+   */
   private emit(): void {
     this.cachedSnapshot = null;
     for (const l of this.listeners) l();
   }
 
+  /**
+   * 归一化并写入拼音选区，同时同步光标到选区末端。
+   *
+   * @param start - 选区起点
+   * @param end - 选区终点
+   */
+  private setPinyinSelection(start: number, end: number): void {
+    const max = this.pinyinInput.length;
+    const s = Math.max(0, Math.min(max, start));
+    const e = Math.max(0, Math.min(max, end));
+    this.pinyinSelectionStart = Math.min(s, e);
+    this.pinyinSelectionEnd = Math.max(s, e);
+    this.pinyinCursorPosition = e;
+  }
+
+  /**
+   * 将拼音选区折叠为插入点。
+   *
+   * @param cursor - 折叠位置
+   */
+  private collapsePinyinSelection(cursor: number): void {
+    this.setPinyinSelection(cursor, cursor);
+  }
+
+  /**
+   * @returns 当前是否存在非空选区
+   */
+  private hasPinyinSelection(): boolean {
+    return this.pinyinSelectionStart !== this.pinyinSelectionEnd;
+  }
+
+  /**
+   * 用文本替换当前选区（若无选区则在光标处插入）。
+   *
+   * @param text - 要插入的文本
+   */
+  private replacePinyinSelection(text: string): void {
+    const before = this.pinyinInput.substring(0, this.pinyinSelectionStart);
+    const after = this.pinyinInput.substring(this.pinyinSelectionEnd);
+    this.pinyinInput = before + text + after;
+    this.collapsePinyinSelection(before.length + text.length);
+  }
+
+  /**
+   * 删除当前选区并将光标折叠到删除起点。
+   *
+   * @returns 是否执行了删除
+   */
+  private deleteSelectedPinyin(): boolean {
+    if (!this.hasPinyinSelection()) return false;
+    this.replacePinyinSelection("");
+    return true;
+  }
+
+  /**
+   * 使高亮候选与当前候选/页码保持一致。
+   */
+  private syncHighlightedCandidate(): void {
+    if (this.candidates.length === 0) {
+      this.highlightedCandidateIndex = null;
+      return;
+    }
+    if (
+      this.highlightedCandidateIndex !== null &&
+      this.highlightedCandidateIndex >= 0 &&
+      this.highlightedCandidateIndex < this.candidates.length
+    ) {
+      return;
+    }
+    const firstIndex = this.page * this.pageSize;
+    this.highlightedCandidateIndex = Math.min(
+      firstIndex,
+      this.candidates.length - 1
+    );
+  }
+
+  /**
+   * 取消已排队的帧级重算任务。
+   */
+  private cancelScheduledRecompute(): void {
+    if (this.recomputeRafId !== null) {
+      cancelAnimationFrame(this.recomputeRafId);
+      this.recomputeRafId = null;
+    }
+  }
+
+  /**
+   * 立即执行候选重算并触发更新；若有排队任务会先取消。
+   */
+  private flushRecomputeAndEmit(): void {
+    this.cancelScheduledRecompute();
+    this.recomputeCandidates();
+    this.emit();
+  }
+
+  /**
+   * 将「重算 + 更新」合并到下一帧，避免高频按键时重复同步计算。
+   */
+  private scheduleRecomputeAndEmit(): void {
+    if (this.recomputeRafId !== null) return;
+    this.recomputeRafId = requestAnimationFrame(() => {
+      this.recomputeRafId = null;
+      this.recomputeCandidates();
+      this.emit();
+    });
+  }
+
+  /**
+   * 清空「失配短路」状态；用于选词、提交、清空输入等语义边界。
+   */
+  private clearMissPrefixLock(): void {
+    this.missPrefixLock = null;
+  }
+
+  /**
+   * 判断当前输入是否可直接短路：
+   * 若已进入失配状态，且本次是对失配前缀的继续追加，则无需再次调用引擎。
+   *
+   * @param input - 当前拼音缓冲
+   * @returns 是否跳过候选计算
+   */
+  private shouldSkipByMissPrefixLock(input: string): boolean {
+    const lock = this.missPrefixLock;
+    if (!lock) return false;
+    return input.length > lock.length && input.startsWith(lock);
+  }
+
+  /**
+   * 候选重算后维护失配锚点。
+   *
+   * @param input - 当前拼音缓冲
+   */
+  private updateMissPrefixLock(input: string): void {
+    if (input.length === 0) {
+      this.clearMissPrefixLock();
+      return;
+    }
+    if (this.candidates.length === 0) {
+      if (
+        this.missPrefixLock === null ||
+        input.length < this.missPrefixLock.length ||
+        !input.startsWith(this.missPrefixLock)
+      ) {
+        this.missPrefixLock = input;
+      }
+      return;
+    }
+    this.clearMissPrefixLock();
+  }
+
+  /**
+   * 基于当前拼音缓冲与引擎计算候选，并应用失配剪枝策略。
+   */
   private recomputeCandidates(): void {
     const engine = this.options.getEngine();
     if (!this.pinyinInput || !engine) {
       this.candidates = [];
       this.page = 0;
+      this.highlightedCandidateIndex = null;
+      this.clearMissPrefixLock();
       return;
     }
+
+    if (this.shouldSkipByMissPrefixLock(this.pinyinInput)) {
+      this.candidates = [];
+      this.page = 0;
+      this.highlightedCandidateIndex = null;
+      return;
+    }
+
     this.candidates = engine.getCandidates(this.pinyinInput).candidates;
     const maxPage = Math.max(
       0,
       Math.ceil(this.candidates.length / this.pageSize) - 1
     );
     if (this.page > maxPage) this.page = maxPage;
+    this.updateMissPrefixLock(this.pinyinInput);
+    this.syncHighlightedCandidate();
   }
 
   /**
@@ -243,6 +433,7 @@ export class PinyinIMEController<
    * @param item - 候选项
    */
   selectCandidate(item: CandidateItem): void {
+    this.cancelScheduledRecompute();
     const engine = this.options.getEngine();
     if (!engine) return;
     this.insertText(item.word);
@@ -256,8 +447,13 @@ export class PinyinIMEController<
       ? remaining.substring(1)
       : remaining;
     this.pinyinInput = nextInput;
-    this.pinyinCursorPosition = nextInput.length;
+    this.collapsePinyinSelection(nextInput.length);
+    this.clearMissPrefixLock();
     this.recomputeCandidates();
+    // 选词后若仍有剩余拼音，默认回到第一页并高亮第一个候选。
+    this.page = 0;
+    this.highlightedCandidateIndex =
+      this.candidates.length > 0 ? 0 : null;
     this.emit();
   }
 
@@ -282,6 +478,10 @@ export class PinyinIMEController<
       Math.ceil(this.candidates.length / this.pageSize) - 1
     );
     this.page = Math.min(maxPage, Math.max(0, next));
+    this.highlightedCandidateIndex =
+      this.candidates.length > 0
+        ? Math.min(this.page * this.pageSize, this.candidates.length - 1)
+        : null;
     this.emit();
   }
 
@@ -366,39 +566,108 @@ export class PinyinIMEController<
     }
 
     if (this.pinyinInput.length > 0) {
+      if (e.key.toLowerCase() === "a" && e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        this.setPinyinSelection(0, this.pinyinInput.length);
+        this.emit();
+        return;
+      }
+
+      if (!/^[a-z']$/i.test(e.key)) {
+        this.flushRecomputeAndEmit();
+      }
+
       if (e.key === "Backspace") {
         e.preventDefault();
+        if (this.deleteSelectedPinyin()) {
+          this.scheduleRecomputeAndEmit();
+          return;
+        }
         if (this.pinyinCursorPosition > 0) {
-          const before = this.pinyinInput.substring(
-            0,
-            this.pinyinCursorPosition - 1
+          this.setPinyinSelection(
+            this.pinyinCursorPosition - 1,
+            this.pinyinCursorPosition
           );
-          const after = this.pinyinInput.substring(this.pinyinCursorPosition);
-          this.pinyinInput = before + after;
-          this.pinyinCursorPosition -= 1;
-          this.recomputeCandidates();
-          this.emit();
+          this.deleteSelectedPinyin();
+          this.scheduleRecomputeAndEmit();
+        }
+        return;
+      }
+
+      if (e.key === "Delete") {
+        e.preventDefault();
+        if (this.deleteSelectedPinyin()) {
+          this.scheduleRecomputeAndEmit();
+          return;
+        }
+        if (this.pinyinCursorPosition < this.pinyinInput.length) {
+          this.setPinyinSelection(
+            this.pinyinCursorPosition,
+            this.pinyinCursorPosition + 1
+          );
+          this.deleteSelectedPinyin();
+          this.scheduleRecomputeAndEmit();
         }
         return;
       }
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        this.pinyinCursorPosition =
+        const nextCursor =
           this.pinyinCursorPosition > 0
             ? this.pinyinCursorPosition - 1
             : this.pinyinInput.length;
+        if (e.shiftKey) {
+          const anchor = this.hasPinyinSelection()
+            ? this.pinyinSelectionStart
+            : this.pinyinCursorPosition;
+          this.setPinyinSelection(anchor, nextCursor);
+        } else {
+          this.collapsePinyinSelection(nextCursor);
+        }
         this.emit();
         return;
       }
 
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        this.pinyinCursorPosition =
+        const nextCursor =
           this.pinyinCursorPosition < this.pinyinInput.length
             ? this.pinyinCursorPosition + 1
             : 0;
+        if (e.shiftKey) {
+          const anchor = this.hasPinyinSelection()
+            ? this.pinyinSelectionEnd
+            : this.pinyinCursorPosition;
+          this.setPinyinSelection(anchor, nextCursor);
+        } else {
+          this.collapsePinyinSelection(nextCursor);
+        }
         this.emit();
+        return;
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (this.candidates.length > 0) {
+          const current = this.highlightedCandidateIndex ?? this.page * this.pageSize;
+          const next = Math.min(this.candidates.length - 1, current + 1);
+          this.highlightedCandidateIndex = next;
+          this.page = Math.floor(next / this.pageSize);
+          this.emit();
+        }
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (this.candidates.length > 0) {
+          const current = this.highlightedCandidateIndex ?? this.page * this.pageSize;
+          const next = Math.max(0, current - 1);
+          this.highlightedCandidateIndex = next;
+          this.page = Math.floor(next / this.pageSize);
+          this.emit();
+        }
         return;
       }
 
@@ -406,7 +675,8 @@ export class PinyinIMEController<
         e.preventDefault();
         this.insertText(this.pinyinInput);
         this.pinyinInput = "";
-        this.pinyinCursorPosition = 0;
+        this.collapsePinyinSelection(0);
+        this.clearMissPrefixLock();
         this.recomputeCandidates();
         this.emit();
         return;
@@ -415,7 +685,8 @@ export class PinyinIMEController<
       if (e.key === "Escape") {
         e.preventDefault();
         this.pinyinInput = "";
-        this.pinyinCursorPosition = 0;
+        this.collapsePinyinSelection(0);
+        this.clearMissPrefixLock();
         this.recomputeCandidates();
         this.emit();
         return;
@@ -424,11 +695,14 @@ export class PinyinIMEController<
       if (e.key === " ") {
         e.preventDefault();
         if (this.candidates.length > 0) {
-          this.selectCandidate(this.candidates[this.page * this.pageSize]);
+          const index = this.highlightedCandidateIndex ?? this.page * this.pageSize;
+          const clamped = Math.min(Math.max(0, index), this.candidates.length - 1);
+          this.selectCandidate(this.candidates[clamped]);
         } else {
           this.insertText(this.pinyinInput);
           this.pinyinInput = "";
-          this.pinyinCursorPosition = 0;
+          this.collapsePinyinSelection(0);
+          this.clearMissPrefixLock();
           this.recomputeCandidates();
           this.emit();
         }
@@ -463,13 +737,9 @@ export class PinyinIMEController<
     if (/^[a-z']$/i.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
       e.stopPropagation();
-      const before = this.pinyinInput.substring(0, this.pinyinCursorPosition);
-      const after = this.pinyinInput.substring(this.pinyinCursorPosition);
       const ch = e.key.toLowerCase();
-      this.pinyinInput = before + ch + after;
-      this.pinyinCursorPosition += 1;
-      this.recomputeCandidates();
-      this.emit();
+      this.replacePinyinSelection(ch);
+      this.scheduleRecomputeAndEmit();
       return;
     }
 

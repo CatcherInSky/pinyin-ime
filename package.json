@@ -28,12 +28,15 @@
     "./dist/pinyin-ime.css"
   ],
   "scripts": {
+    "dev": "pnpm run build:watch",
     "prebuild": "node scripts/embed-css.mjs",
     "build": "tsup",
+    "build:watch": "tsup --watch --no-clean",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
     "site:dev": "pnpm --filter pinyin-ime-site dev --mode development",
+    "site:dev:hot": "pnpm --filter pinyin-ime-site dev --mode development",
     "site:dev:npm": "pnpm --filter pinyin-ime-site dev --mode production",
     "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build --mode production",
     "publish:npm": "pnpm publish --no-git-checks --registry https://registry.npmjs.org/"

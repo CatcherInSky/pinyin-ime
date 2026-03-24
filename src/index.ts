@@ -1,5 +1,9 @@
 export { joinClassNames } from "./lib/classnames";
-export type { PinyinPopupClassNames, PopupPosition } from "./lib/types";
+export type {
+  PinyinPopupClassNames,
+  PopupPosition,
+  PopupPlacement,
+} from "./lib/types";
 export type { DictEntry, GooglePinyinDict } from "../dictionary/google_pinyin_dict";
 export {
   getCandidates,

@@ -243,3 +243,17 @@ el.getDictionary = () =>
 ## 7. 字典数据
 
 拼音词表衍生自 [web-pinyin-ime](https://github.com/dongyuwei/web-pinyin-ime)。
+
+---
+
+## 8. 神秘问题
+
+最近在部署本项目演示页时遇到一个比较诡异的问题，想向社区请教经验：
+
+- 站点根路径可以正常访问（HTTP 200）。
+-  `pinyin-ime` 子路径（包含 `index.html`）稳定返回 404。
+- 但 `pinyinime` 子路径（包含 `index.html`）就正常。
+- Actions 构建与部署流程显示成功，且构建产物里确认包含 `pinyin-ime` 目录及其页面文件。
+- 本地静态服务同一份产物可正常访问对应路径。
+
+所以本项目的demo页面是 `https://catcherinsky.github.io/pinyinime/` 而不是 `https://catcherinsky.github.io/piny-inime/` 有点强迫症。

@@ -16,7 +16,7 @@ import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
 import type { PinyinEngine } from "./engine/pinyin-engine";
 import type { CandidateItem } from "./engine/pinyin-engine";
 import { PinyinIMEController } from "./ime/pinyin-ime-controller";
-import type { PopupPosition } from "./lib/types";
+import type { PopupPlacement, PopupPosition } from "./lib/types";
 import { PINYIN_IME_STYLE_TEXT } from "./ime/pinyin-ime-style-text";
 
 /** 词典加载状态 */
@@ -54,6 +54,7 @@ export class PinyinIMEEditor extends LitElement {
     editorType: { type: String, attribute: "editor-type" },
     pageSize: { type: Number, attribute: "page-size" },
     enabled: { type: Boolean },
+    popupPosition: { attribute: false },
     getDictionary: { attribute: false },
   };
 
@@ -65,6 +66,8 @@ export class PinyinIMEEditor extends LitElement {
   declare pageSize: number;
   /** 是否启用 IME 拦截 */
   declare enabled: boolean;
+  /** 候选框相对输入框的方位 */
+  declare popupPosition: PopupPlacement;
   /** 词典加载函数，返回词典或 Promise；初始化时执行，resolve 前候选框 loading */
   declare getDictionary?: GetDictionaryFn;
 
@@ -90,6 +93,7 @@ export class PinyinIMEEditor extends LitElement {
     this.editorType = "input";
     this.enabled = true;
     this.pageSize = 5;
+    this.popupPosition = "top";
   }
 
   /**
@@ -110,7 +114,32 @@ export class PinyinIMEEditor extends LitElement {
       return;
     }
     const rect = el.getBoundingClientRect();
-    this._position = { top: rect.top, left: rect.left, width: rect.width };
+    this._position = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  /**
+   * 计算 popup 内联定位样式。
+   *
+   * @param position - 输入框几何快照
+   * @returns style 字符串
+   */
+  private _popupStyle(position: PopupPosition): string {
+    const gap = 2;
+    if (this.popupPosition === "bottom") {
+      return `top: ${position.top + position.height + gap}px; left: ${position.left}px; width: ${position.width}px;`;
+    }
+    if (this.popupPosition === "left") {
+      return `top: ${position.top}px; left: ${position.left - gap}px; width: ${position.width}px; transform: translateX(-100%);`;
+    }
+    if (this.popupPosition === "right") {
+      return `top: ${position.top}px; left: ${position.left + position.width + gap}px; width: ${position.width}px;`;
+    }
+    return `top: ${position.top}px; left: ${position.left}px; width: ${position.width}px; transform: translateY(-100%) translateY(-2px);`;
   }
 
   /**
@@ -307,6 +336,15 @@ export class PinyinIMEEditor extends LitElement {
     }
   }
 
+  /**
+   * 阻止候选框鼠标按下导致输入框失焦。
+   *
+   * @param e - 鼠标事件
+   */
+  private _onPopupMouseDown(e: MouseEvent): void {
+    e.preventDefault();
+  }
+
   private _renderPopup() {
     const c = this._controller;
     const position = this._position;
@@ -316,10 +354,13 @@ export class PinyinIMEEditor extends LitElement {
     const {
       pinyinInput,
       pinyinCursorPosition,
+      pinyinSelectionStart,
+      pinyinSelectionEnd,
       candidates,
       displayCandidates,
       page,
       pageSize,
+      highlightedCandidateIndex,
     } = c.getSnapshot();
     const totalPages = Math.ceil(candidates.length / pageSize) || 1;
     const hasPrev = page > 0;
@@ -329,14 +370,24 @@ export class PinyinIMEEditor extends LitElement {
       <div
         part="popup"
         class="pinyin-ime-popup"
-        style="top: ${position.top}px; left: ${position.left}px; width: ${position.width}px; transform: translateY(-100%) translateY(-2px);"
+        style=${this._popupStyle(position)}
+        @mousedown=${this._onPopupMouseDown}
       >
         <div part="pinyin-bar" class="pinyin-ime-pinyin-bar">
-          ${pinyinInput.substring(0, pinyinCursorPosition)}<span
-            part="cursor"
-            class="pinyin-ime-cursor"
-          ></span
-          >${pinyinInput.substring(pinyinCursorPosition)}
+          ${pinyinSelectionStart !== pinyinSelectionEnd
+            ? html`${pinyinInput.substring(0, pinyinSelectionStart)}<span
+                  part="pinyin-selection"
+                  class="pinyin-ime-pinyin-selection"
+                  >${pinyinInput.substring(
+                    pinyinSelectionStart,
+                    pinyinSelectionEnd
+                  )}</span
+                >${pinyinInput.substring(pinyinSelectionEnd)}`
+            : html`${pinyinInput.substring(0, pinyinCursorPosition)}<span
+                  part="cursor"
+                  class="pinyin-ime-cursor"
+                ></span
+                >${pinyinInput.substring(pinyinCursorPosition)}`}
         </div>
         <div part="candidate-list" class="pinyin-ime-candidate-list">
           ${loading
@@ -344,12 +395,19 @@ export class PinyinIMEEditor extends LitElement {
                 >加载中…</div
               >`
             : displayCandidates.length > 0
-              ? displayCandidates.map(
-                  (item, idx) => html`
+              ? displayCandidates.map((item, idx) => {
+                  const globalIndex = page * pageSize + idx;
+                  const isActive = highlightedCandidateIndex === globalIndex;
+                  return html`
                     <div
-                      part="candidate-row"
-                      class="pinyin-ime-candidate-row"
+                      part=${isActive
+                        ? "candidate-row candidate-row-active"
+                        : "candidate-row"}
+                      class="pinyin-ime-candidate-row ${isActive
+                        ? "pinyin-ime-candidate-row--active"
+                        : ""}"
                       role="option"
+                      aria-selected=${isActive ? "true" : "false"}
                       @mousedown=${(e: MouseEvent) => {
                         e.preventDefault();
                         this._onSelect(item);
@@ -362,8 +420,8 @@ export class PinyinIMEEditor extends LitElement {
                         >${item.word}</span
                       >
                     </div>
-                  `
-                )
+                  `;
+                })
               : html`<div part="empty" class="pinyin-ime-empty">无候选词</div>`}
         </div>
         ${!loading && candidates.length > pageSize

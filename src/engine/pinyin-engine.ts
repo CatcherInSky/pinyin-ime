@@ -12,6 +12,20 @@ import type { GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
  * 与单独输入 `z` 时逻辑一致，但长串下只取高频前若干条。
  */
 const SINGLE_LETTER_PREFIX_CAP = 200;
+/** 候选返回上限：限制排序与渲染压力，保障长串输入稳定性。 */
+const MAX_CANDIDATE_COUNT = 300;
+/** 短输入（1-2 键）时启用单字增强。 */
+const SHORT_INPUT_SINGLE_CHAR_BOOST_MAX_LEN = 2;
+/** 单字增强分值：仅在短输入下参与排序加权。 */
+const SHORT_INPUT_SINGLE_CHAR_BOOST_SCORE = 50_000;
+/** 前排单字保底席位数量（仅短输入）。 */
+const SHORT_INPUT_SINGLE_CHAR_FLOOR = 2;
+/** 短输入前排观察窗口：在该范围内保证单字席位。 */
+const SHORT_INPUT_SINGLE_CHAR_FLOOR_WINDOW = 10;
+/** 插入单字的起始位置（保留最前若干位给强匹配候选）。 */
+const SHORT_INPUT_SINGLE_CHAR_INSERT_AT = 2;
+/** 触发前缀补充召回的最小输入长度。 */
+const PREFIX_EXPANSION_MIN_INPUT_LEN = 2;
 
 /** 单个候选词及其消耗的拼音长度 */
 export interface CandidateItem {
@@ -29,6 +43,15 @@ export interface PinyinMatchResult {
 interface WordFreq {
   w: string;
   f: number;
+}
+
+/**
+ * 拼音 key 前缀索引节点。
+ */
+interface PinyinKeyTrieNode {
+  children: Map<string, PinyinKeyTrieNode>;
+  /** 当前前缀下所有完整 key。 */
+  keysUnderPrefix: string[];
 }
 
 /**
@@ -76,6 +99,86 @@ function buildWordMaxFreqByWord(
 }
 
 /**
+ * 构建「词 -> 所有拼音 key」索引，避免反向匹配时重复全量遍历词典。
+ *
+ * @param dict - 拼音词典
+ * @returns 词到 key 列表的映射
+ */
+function buildWordKeysIndex(
+  dict: Record<string, WordFreq[] | undefined>
+): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const key in dict) {
+    const list = dict[key];
+    if (!list) continue;
+    for (const item of list) {
+      const keys = index.get(item.w);
+      if (keys) {
+        keys.push(key);
+      } else {
+        index.set(item.w, [key]);
+      }
+    }
+  }
+  return index;
+}
+
+/**
+ * 创建空 Trie 节点。
+ *
+ * @returns 新节点
+ */
+function createPinyinKeyTrieNode(): PinyinKeyTrieNode {
+  return { children: new Map<string, PinyinKeyTrieNode>(), keysUnderPrefix: [] };
+}
+
+/**
+ * 基于词典 key 构建前缀 Trie 索引。
+ *
+ * @param dict - 拼音词典
+ * @returns 根节点
+ */
+function buildPinyinKeyTrie(
+  dict: Record<string, WordFreq[] | undefined>
+): PinyinKeyTrieNode {
+  const root = createPinyinKeyTrieNode();
+  for (const key in dict) {
+    if (!dict[key]) continue;
+    let node = root;
+    node.keysUnderPrefix.push(key);
+    for (const ch of key) {
+      let next = node.children.get(ch);
+      if (!next) {
+        next = createPinyinKeyTrieNode();
+        node.children.set(ch, next);
+      }
+      node = next;
+      node.keysUnderPrefix.push(key);
+    }
+  }
+  return root;
+}
+
+/**
+ * 读取 Trie 中某前缀下的所有 key。
+ *
+ * @param root - Trie 根节点
+ * @param prefix - 拼音前缀
+ * @returns 命中的 key 列表
+ */
+function getKeysByPrefix(
+  root: PinyinKeyTrieNode,
+  prefix: string
+): readonly string[] {
+  let node: PinyinKeyTrieNode | undefined = root;
+  for (const ch of prefix) {
+    node = node.children.get(ch);
+    if (!node) return [];
+  }
+  return node.keysUnderPrefix;
+}
+
+/**
  * 基于给定词典创建拼音引擎；同一词典可复用同一实例以避免重复构建索引。
  *
  * @param dict - 与 {@link GooglePinyinDict} 同形的记录表
@@ -84,6 +187,9 @@ function buildWordMaxFreqByWord(
 export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
   const d = dict as Record<string, WordFreq[] | undefined>;
   const wordMaxFreqByWord = buildWordMaxFreqByWord(d);
+  const wordKeysIndex = buildWordKeysIndex(d);
+  const keyTrieRoot = buildPinyinKeyTrie(d);
+  const prefixWordsCache = new Map<string, WordFreq[]>();
 
   const syllableSet = new Set(
     Object.keys(d).filter(
@@ -107,31 +213,27 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
   }
 
   function collectWordsForPrefixKey(prefix: string): WordFreq[] {
+    const cached = prefixWordsCache.get(prefix);
+    if (cached) return cached;
+
     const fullGroups: WordFreq[][] = [];
     const exactMatch = d[prefix];
     if (exactMatch) {
       fullGroups.push(exactMatch);
     } else {
-      for (const key in d) {
-        if (key.startsWith(prefix)) {
-          const val = d[key];
-          if (val) fullGroups.push(val);
-        }
+      const prefixKeys = getKeysByPrefix(keyTrieRoot, prefix);
+      for (const key of prefixKeys) {
+        const val = d[key];
+        if (val) fullGroups.push(val);
       }
     }
-    return mergeAndSort(fullGroups);
+    const merged = mergeAndSort(fullGroups);
+    prefixWordsCache.set(prefix, merged);
+    return merged;
   }
 
   function getWordKeys(word: string): string[] {
-    const keys: string[] = [];
-    for (const key in d) {
-      const val = d[key];
-      if (!val) continue;
-      if (val.some((item) => item.w === word)) {
-        keys.push(key);
-      }
-    }
-    return keys;
+    return wordKeysIndex.get(word) ?? [];
   }
 
   function splitToSyllables(key: string): string[] | null {
@@ -183,6 +285,33 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
     return best;
   }
 
+  /**
+   * 计算「输入前缀」在 key 上可匹配的最长子序列长度（顺序一致、可跳过 key 中字符）。
+   *
+   * @remarks
+   * 这是一种更宽松的混拼回退策略：当音节切分无法覆盖某些简拼组合时，
+   * 仍可按顺序匹配（例如 `tqi` 对 `tianqi` 可得到 3）。
+   *
+   * @param input - 用户拼音输入（已归一化）
+   * @param key - 词条拼音 key
+   * @returns 可消去的输入长度
+   */
+  function matchSubsequenceConsumedLength(input: string, key: string): number {
+    if (!input || !key) return 0;
+    let consumed = 0;
+    let keyPos = 0;
+    while (consumed < input.length && keyPos < key.length) {
+      const ch = input[consumed];
+      while (keyPos < key.length && key[keyPos] !== ch) {
+        keyPos += 1;
+      }
+      if (keyPos >= key.length) break;
+      consumed += 1;
+      keyPos += 1;
+    }
+    return consumed;
+  }
+
   function upsertCandidate(
     list: CandidateItem[],
     indexMap: Map<string, number>,
@@ -204,15 +333,73 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
     return wordMaxFreqByWord.get(word) ?? 0;
   }
 
+  /**
+   * 按「匹配长度优先，其次频率」排序；短输入时对单字做轻量增强。
+   *
+   * @param items - 候选列表
+   * @param inputLen - 输入长度
+   * @returns 排序并截断后的候选
+   */
   function sortCandidatesByMatchThenFreq(
-    items: CandidateItem[]
+    items: CandidateItem[],
+    inputLen: number
   ): CandidateItem[] {
-    return [...items].sort((a, b) => {
+    const isShortInput = inputLen <= SHORT_INPUT_SINGLE_CHAR_BOOST_MAX_LEN;
+    const getScore = (item: CandidateItem): number => {
+      let score = getWordMaxFreq(item.word);
+      if (isShortInput && item.word.length === 1) {
+        score += SHORT_INPUT_SINGLE_CHAR_BOOST_SCORE;
+      }
+      return score;
+    };
+    const sorted = [...items].sort((a, b) => {
       if (b.matchedLength !== a.matchedLength) {
         return b.matchedLength - a.matchedLength;
       }
-      return getWordMaxFreq(b.word) - getWordMaxFreq(a.word);
+      return getScore(b) - getScore(a);
     });
+    return sorted;
+  }
+
+  /**
+   * 短输入场景下保障前排有最少单字席位，改善首屏可选性。
+   *
+   * @param items - 已排序候选
+   * @param inputLen - 输入长度
+   * @returns 应用单字席位策略后的候选
+   */
+  function applyShortInputSingleCharFloor(
+    items: CandidateItem[],
+    inputLen: number
+  ): CandidateItem[] {
+    if (inputLen > SHORT_INPUT_SINGLE_CHAR_BOOST_MAX_LEN) return items;
+    if (items.length === 0) return items;
+
+    const top = items.slice(
+      0,
+      Math.min(items.length, SHORT_INPUT_SINGLE_CHAR_FLOOR_WINDOW)
+    );
+    const existingSingleCount = top.filter((it) => it.word.length === 1).length;
+    if (existingSingleCount >= SHORT_INPUT_SINGLE_CHAR_FLOOR) return items;
+
+    const missing = SHORT_INPUT_SINGLE_CHAR_FLOOR - existingSingleCount;
+    const promote = items
+      .slice(top.length)
+      .filter((it) => it.word.length === 1)
+      .slice(0, missing);
+    if (promote.length === 0) return items;
+
+    const result = [...items];
+    for (const p of promote) {
+      const idx = result.indexOf(p);
+      if (idx >= 0) result.splice(idx, 1);
+    }
+    const insertAt = Math.min(
+      result.length,
+      Math.max(SHORT_INPUT_SINGLE_CHAR_INSERT_AT, existingSingleCount)
+    );
+    result.splice(insertAt, 0, ...promote);
+    return result;
   }
 
   function computeMatchedLength(
@@ -226,7 +413,10 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
     let maxLen = fallback;
     const keys = getWordKeys(word);
     for (const key of keys) {
-      const consumed = matchMixedConsumedLength(normalized, key);
+      const consumed = Math.max(
+        matchMixedConsumedLength(normalized, key),
+        matchSubsequenceConsumedLength(normalized, key)
+      );
       if (consumed > maxLen) maxLen = consumed;
     }
     return maxLen;
@@ -245,7 +435,7 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
       upsertCandidate(result, indexMap, w, normalized.length);
     }
 
-    if (normalized.length >= 4) {
+    if (normalized.length >= PREFIX_EXPANSION_MIN_INPUT_LEN) {
       for (let sylLen = 1; sylLen < normalized.length; sylLen++) {
         const syl = normalized.substring(0, sylLen);
         let sylWords = collectWordsForPrefixKey(syl);
@@ -276,7 +466,12 @@ export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
       }
     }
 
-    return { candidates: sortCandidatesByMatchThenFreq(result) };
+    const sorted = sortCandidatesByMatchThenFreq(result, normalized.length);
+    const floored = applyShortInputSingleCharFloor(sorted, normalized.length);
+    if (floored.length <= MAX_CANDIDATE_COUNT) {
+      return { candidates: floored };
+    }
+    return { candidates: floored.slice(0, MAX_CANDIDATE_COUNT) };
   }
 
   return { getCandidates, computeMatchedLength };

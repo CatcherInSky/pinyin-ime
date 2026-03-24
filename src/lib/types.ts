@@ -3,7 +3,11 @@ export interface PopupPosition {
   top: number;
   left: number;
   width: number;
+  height: number;
 }
+
+/** 候选框相对输入框的方位。 */
+export type PopupPlacement = "top" | "bottom" | "left" | "right";
 
 /**
  * 候选弹窗各区域的 `className`；用于覆盖 {@link defaultPinyinPopupClassNames}。

@@ -12,8 +12,10 @@
   --pinyin-ime-popup-border: #e4e4e7;
   --pinyin-ime-cursor-color: #2563eb;
   --pinyin-ime-hover-bg: #f4f4f5;
+  --pinyin-ime-active-bg: #e0ecff;
   --pinyin-ime-text-color: #18181b;
   --pinyin-ime-muted-color: #71717a;
+  --pinyin-ime-selection-bg: #bfdbfe;
 }
 
 .pinyin-ime-field-wrap {
@@ -94,6 +96,11 @@
   animation: pinyin-ime-caret-blink 1s step-end infinite;
 }
 
+.pinyin-ime-pinyin-selection {
+  border-radius: 2px;
+  background: var(--pinyin-ime-selection-bg);
+}
+
 @keyframes pinyin-ime-caret-blink {
   50% {
     opacity: 0;
@@ -111,6 +118,10 @@
 
 .pinyin-ime-candidate-row:hover {
   background: var(--pinyin-ime-hover-bg);
+}
+
+.pinyin-ime-candidate-row--active {
+  background: var(--pinyin-ime-active-bg);
 }
 
 .pinyin-ime-candidate-index {

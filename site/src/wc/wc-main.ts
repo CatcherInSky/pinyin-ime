@@ -105,10 +105,12 @@ function appendShortcuts(parent: HTMLElement) {
   ul.className = "mt-2 list-inside list-disc space-y-1 text-muted-foreground";
   const lines = [
     "字母 a–z：写入拼音缓冲",
-    "空格：选第一候选；无候选则上屏拼音",
+    "空格：选择当前高亮候选；无候选则上屏拼音",
+    "上/下方向键：切换候选高亮（默认高亮第一个）",
     "1–n：选当前页第 n 个候选（默认每页 5 条，最大 9）",
     "= / . / 小键盘 +：下一页；- / , / 小键盘 -：上一页",
     "左右方向键：拼音串内移动光标",
+    "Ctrl+A：全选拼音缓冲，可删除或直接替换",
     "Enter：上屏拼音；Escape：清空缓冲",
   ];
   for (const t of lines) {

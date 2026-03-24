@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { PinyinIMEEditor } from "pinyin-ime";
+import type { PopupPlacement } from "pinyin-ime";
 import { getDemoRoutes } from "../common/demo-routes";
 import "pinyin-ime/pinyin-ime.css";
 import "../common/index.css";
@@ -13,10 +14,12 @@ if (!customElements.get("pinyin-ime-editor")) {
 /** 快捷键说明文案（与其它演示页一致）。 */
 const SHORTCUT_LINES = [
   "字母 a–z：写入拼音缓冲",
-  "空格：选第一候选；无候选则上屏拼音",
+  "空格：选择当前高亮候选；无候选则上屏拼音",
+  "上/下方向键：切换候选高亮（默认高亮第一个）",
   "1–n：选当前页第 n 个候选（默认每页 5 条，最大 9）",
   "= / . / 小键盘 +：下一页；- / , / 小键盘 -：上一页",
   "左右方向键：拼音串内移动光标",
+  "Ctrl+A：全选拼音缓冲，可删除或直接替换",
   "Enter：上屏拼音；Escape：清空缓冲",
 ] as const;
 
@@ -26,6 +29,7 @@ type GooglePinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
   value: string;
   getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  popupPosition?: PopupPlacement;
 };
 
 const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
@@ -90,8 +94,16 @@ function PinyinImeEditorCtl(props: {
   variant?: "input" | "textarea";
   className?: string;
   useCdnDictionary?: boolean;
+  popupPosition?: PopupPlacement;
 }) {
-  const { value, onValueChange, variant, className, useCdnDictionary } = props;
+  const {
+    value,
+    onValueChange,
+    variant,
+    className,
+    useCdnDictionary,
+    popupPosition,
+  } = props;
   const ref = useRef<PinyinHostEl | null>(null);
 
   useEffect(() => {
@@ -123,6 +135,12 @@ function PinyinImeEditorCtl(props: {
     }
     delete el.getDictionary;
   }, [useCdnDictionary]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.popupPosition = popupPosition;
+  }, [popupPosition]);
 
   return (
     <pinyin-ime-editor
@@ -215,6 +233,7 @@ function ReactDemoPage() {
           onValueChange={setMulti}
           variant="textarea"
           useCdnDictionary
+          popupPosition="bottom"
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(multi)}</span>
@@ -243,7 +262,9 @@ function ReactDemoPage() {
 function main() {
   const el = document.getElementById("root");
   if (!el) return;
-  ReactDOM.createRoot(el).render(
+  const rootEl = el as HTMLElement & { __pinyinImeReactRoot?: ReactDOM.Root };
+  rootEl.__pinyinImeReactRoot ??= ReactDOM.createRoot(el);
+  rootEl.__pinyinImeReactRoot.render(
     <React.StrictMode>
       <ReactDemoPage />
     </React.StrictMode>
