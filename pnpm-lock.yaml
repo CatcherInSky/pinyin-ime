@@ -33,8 +33,8 @@ importers:
   site:
     dependencies:
       pinyin-ime:
-        specifier: npm:pinyin-ime@>=0.5.0
-        version: 0.5.0
+        specifier: npm:pinyin-ime@>=0.6.0
+        version: 0.6.0
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1192,8 +1192,8 @@ packages:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
     engines: {node: '>=0.10.0'}
 
-  pinyin-ime@0.5.0:
-    resolution: {integrity: sha512-zQIDykQ7dsZ8KxwygQO09LiYhY7u2qQ7WPbeUgeEu3/U9Iko6J9Onvt5hEFlOJlXNpyaJDhGBI3bVJ4k7M9p7g==}
+  pinyin-ime@0.6.0:
+    resolution: {integrity: sha512-eRS4K8idcQKsGbsJINOt4AZV5TWgWCaOAbl0aEDh6xRNJ0UVnxaAhBPZMseim4a4Y+BqD4oq+63Dba1MiuBKqg==}
     engines: {node: '>=18'}
 
   pirates@4.0.7:
@@ -2567,7 +2567,7 @@ snapshots:
 
   pify@2.3.0: {}
 
-  pinyin-ime@0.5.0: {}
+  pinyin-ime@0.6.0: {}
 
   pirates@4.0.7: {}
 
