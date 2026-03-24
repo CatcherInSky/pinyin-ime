@@ -10,15 +10,19 @@ import { resolve } from "node:path";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    dict: "src/dict.ts",
   },
   format: ["esm"],
   dts: true,
   sourcemap: true,
   clean: true,
   outDir: "dist",
-  external: ["react", "react-dom"],
+  external: [],
   treeshake: true,
-  splitting: true,
+  splitting: false,
+  minifyWhitespace: true,
+  minifySyntax: true,
+  minifyIdentifiers: false,
   noExternal: [/^lit(\/|$)/],
   async onSuccess() {
     copyFileSync(

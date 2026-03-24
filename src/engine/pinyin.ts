@@ -1,20 +1,8 @@
 /**
  * @file pinyin.ts
- * @description 拼音输入法引擎的默认导出（内嵌词典）与类型再导出。
- *
- * @remarks
- * 高级用法请使用 {@link createPinyinEngine} 注入自定义词典，或
- * {@link loadGooglePinyinDictFromUrl} 远程加载。
+ * @description 拼音输入法引擎导出；词典由 element 通过 getDictionary 或动态 import 加载。
  */
-import { dict } from "../../dictionary/google_pinyin_dict";
-import { createPinyinEngine } from "./pinyin-engine";
-
-/**
- * 使用包内嵌 {@link dict} 构建的默认引擎；未传入自定义词典/url 时与 {@link getCandidates} 行为一致。
- */
-export const defaultPinyinEngine = createPinyinEngine(dict);
-
-const defaultEngine = defaultPinyinEngine;
+import { getDefaultEngine } from "../dictionary/registry";
 
 export type {
   CandidateItem,
@@ -32,27 +20,26 @@ export {
  * 选词后从输入中应消去的长度（反向拼音匹配）。
  *
  * @remarks
- * 使用包内默认内嵌词典。自定义词典请使用 {@link createPinyinEngine} 返回实例上的方法。
- *
- * @param word - 选中的词
- * @param input - 当前拼音输入
- * @param fallback - 无匹配时的回退长度
- * @returns 应消去的长度
+ * 使用已注册的默认引擎；需至少有一个 pinyin-ime-editor 已加载词典。
  */
 export function computeMatchedLength(
   word: string,
   input: string,
   fallback: number
 ): number {
-  return defaultEngine.computeMatchedLength(word, input, fallback);
+  const engine = getDefaultEngine();
+  if (!engine) return fallback;
+  return engine.computeMatchedLength(word, input, fallback);
 }
 
 /**
- * 根据拼音输入获取候选词列表（默认内嵌词典）。
+ * 根据拼音输入获取候选词列表。
  *
- * @param input - 拼音字符串（小写，可含单引号分隔）
- * @returns 匹配结果，每项含 word 与 matchedLength
+ * @remarks
+ * 使用已注册的默认引擎；需至少有一个 pinyin-ime-editor 已加载词典，否则返回空列表。
  */
 export function getCandidates(input: string) {
-  return defaultEngine.getCandidates(input);
+  const engine = getDefaultEngine();
+  if (!engine) return { candidates: [] };
+  return engine.getCandidates(input);
 }

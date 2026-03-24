@@ -9,14 +9,69 @@ import "../common/index.css";
 const SHORTCUT_LINES = [
   "字母 a–z：写入拼音缓冲",
   "空格：选第一候选；无候选则上屏拼音",
-  "1–n：选当前页第 n 个候选（默认每页 3 条，最大 9）",
+  "1–n：选当前页第 n 个候选（默认每页 5 条，最大 9）",
   "= / . / 小键盘 +：下一页；- / , / 小键盘 -：上一页",
   "左右方向键：拼音串内移动光标",
   "Enter：上屏拼音；Escape：清空缓冲",
 ] as const;
 
 /** Lit 宿主上的受控 `value` 与自定义事件。 */
-type PinyinHostEl = HTMLElement & { value: string };
+type DictEntry = { w: string; f: number };
+type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinHostEl = HTMLElement & {
+  value: string;
+  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+};
+
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+
+const REACT_CDN_CODE = `import { useEffect, useRef } from "react";
+import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+type DictEntry = { w: string; f: number };
+type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinHostEl = HTMLElement & {
+  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+};
+
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+
+function TextareaWithCdnDict() {
+  const ref = useRef<PinyinHostEl | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.getDictionary = async () => {
+      const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+        dict: GooglePinyinDict;
+      };
+      return mod.dict;
+    };
+  }, []);
+
+  return <pinyin-ime-editor ref={ref} editor-type="textarea" />;
+}`;
+const REACT_LOCAL_CODE = `import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+function InputWithLocalDict() {
+  // 本地词典（默认行为）：不设置 getDictionary
+  return <pinyin-ime-editor />;
+}`;
+
+/**
+ * Loads dictionary module from CDN and returns exported dict.
+ *
+ * @returns Promise of Google pinyin dictionary
+ */
+async function loadCdnDict(): Promise<GooglePinyinDict> {
+  const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+    dict: GooglePinyinDict;
+  };
+  return mod.dict;
+}
 
 /**
  * 在 React 中受控使用 `<pinyin-ime-editor>`：同步 `value` 并转发 `pinyin-ime-change`。
@@ -29,8 +84,9 @@ function PinyinImeEditorCtl(props: {
   onValueChange: (v: string) => void;
   variant?: "input" | "textarea";
   className?: string;
+  useCdnDictionary?: boolean;
 }) {
-  const { value, onValueChange, variant, className } = props;
+  const { value, onValueChange, variant, className, useCdnDictionary } = props;
   const ref = useRef<PinyinHostEl | null>(null);
 
   useEffect(() => {
@@ -42,8 +98,8 @@ function PinyinImeEditorCtl(props: {
     const handler = (e: Event) => {
       onValueChange((e as CustomEvent<{ value: string }>).detail.value);
     };
-    el.addEventListener("pinyin-ime-change", handler);
-    return () => el.removeEventListener("pinyin-ime-change", handler);
+    el.addEventListener("change", handler);
+    return () => el.removeEventListener("change", handler);
   }, [onValueChange]);
 
   useLayoutEffect(() => {
@@ -53,11 +109,21 @@ function PinyinImeEditorCtl(props: {
     }
   }, [value]);
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (useCdnDictionary) {
+      el.getDictionary = loadCdnDict;
+      return;
+    }
+    delete el.getDictionary;
+  }, [useCdnDictionary]);
+
   return (
     <pinyin-ime-editor
       ref={ref}
       className={className}
-      variant={variant}
+      editor-type={variant}
     />
   );
 }
@@ -131,6 +197,9 @@ function ReactDemoPage() {
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(single)}</span>
         </p>
+        <pre className="overflow-x-auto rounded bg-muted/40 p-3 text-xs">
+          <code>{REACT_LOCAL_CODE}</code>
+        </pre>
       </section>
 
       <section className="space-y-2">
@@ -140,10 +209,14 @@ function ReactDemoPage() {
           value={multi}
           onValueChange={setMulti}
           variant="textarea"
+          useCdnDictionary
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(multi)}</span>
         </p>
+        <pre className="overflow-x-auto rounded bg-muted/40 p-3 text-xs">
+          <code>{REACT_CDN_CODE}</code>
+        </pre>
       </section>
 
       <section className="rounded-md border border-border bg-muted/40 p-4 text-sm">
@@ -154,6 +227,7 @@ function ReactDemoPage() {
           ))}
         </ul>
       </section>
+
     </main>
   );
 }

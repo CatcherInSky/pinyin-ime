@@ -1,6 +1,6 @@
 {
   "name": "pinyin-ime",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "拼音转汉字输入法能力：在无法使用系统输入法的场景使用，通过候选框选词上屏",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,8 +11,11 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./pinyin-ime.css": "./dist/pinyin-ime.css",
-    "./google-pinyin-dict.json": "./dist/google-pinyin-dict.json"
+    "./dict": {
+      "import": "./dist/dict.js",
+      "types": "./dist/dict.d.ts"
+    },
+    "./pinyin-ime.css": "./dist/pinyin-ime.css"
   },
   "files": [
     "dist",
@@ -24,16 +27,16 @@
   ],
   "scripts": {
     "prebuild": "node scripts/embed-css.mjs",
-    "build": "tsup && tsx scripts/write-google-pinyin-dict-json.ts",
+    "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
-    "site:dev": "pnpm --filter pinyin-ime-site dev",
-    "site:build": "pnpm --filter pinyin-ime-site build",
+    "site:dev": "pnpm --filter pinyin-ime-site dev --mode development",
+    "site:dev:npm": "pnpm --filter pinyin-ime-site dev --mode production",
+    "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build --mode production",
     "publish:npm": "pnpm publish --no-git-checks --registry https://registry.npmjs.org/"
   },
   "keywords": [
-    "react",
     "pinyin",
     "ime",
     "input",
@@ -55,19 +58,9 @@
   "engines": {
     "node": ">=18"
   },
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
   "devDependencies": {
-    "@testing-library/react": "^16.2.0",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^26.0.0",
     "lit": "^3.2.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "tsup": "^8.3.5",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",

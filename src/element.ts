@@ -10,13 +10,33 @@ import {
   type PropertyValues,
 } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { defaultPinyinEngine, createPinyinEngine } from "./engine/pinyin";
-import { loadGooglePinyinDictFromUrl } from "./dictionary/load-dictionary";
+import { createPinyinEngine } from "./engine/pinyin";
+import { registerDefaultEngine } from "./dictionary/registry";
+import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
 import type { PinyinEngine } from "./engine/pinyin-engine";
 import type { CandidateItem } from "./engine/pinyin-engine";
 import { PinyinIMEController } from "./ime/pinyin-ime-controller";
 import type { PopupPosition } from "./lib/types";
 import { PINYIN_IME_STYLE_TEXT } from "./ime/pinyin-ime-style-text";
+
+/** 词典加载状态 */
+type DictionaryState = "idle" | "loading" | "ready" | "error";
+
+/** 自有属性名（不透传到内部 input/textarea） */
+const RESERVED_ATTRIBUTES = new Set([
+  "value",
+  "editor-type",
+  "page-size",
+  "enabled",
+  "class",
+]);
+
+/**
+ * getDictionary 函数类型：返回词典或 Promise；组件初始化时调用，resolve 前候选框显示 loading。
+ */
+export type GetDictionaryFn = () =>
+  | Promise<GooglePinyinDict>
+  | GooglePinyinDict;
 
 /**
  * 宿主上可监听的事件：`detail.value` 为新的受控文本。
@@ -24,38 +44,40 @@ import { PINYIN_IME_STYLE_TEXT } from "./ime/pinyin-ime-style-text";
 export type PinyinIMEChangeDetail = { value: string };
 
 /**
- * 拼音 IME 自定义元素；属性 `dictionary-url` 可远程加载词典 JSON。
+ * 拼音 IME 自定义元素；通过 `getDictionary` property 自定义词典加载。
  */
 export class PinyinIMEEditor extends LitElement {
   static override styles = [unsafeCSS(PINYIN_IME_STYLE_TEXT)];
 
   static override properties = {
     value: { type: String },
-    variant: { type: String },
-    dictionaryUrl: { type: String, attribute: "dictionary-url" },
-    enabled: { type: Boolean },
+    editorType: { type: String, attribute: "editor-type" },
     pageSize: { type: Number, attribute: "page-size" },
+    enabled: { type: Boolean },
+    getDictionary: { attribute: false },
   };
 
   /** 受控文本 */
   declare value: string;
   /** `input` 或 `textarea` */
-  declare variant: "input" | "textarea";
-  /** 远程词典 URL（空则使用包内默认引擎） */
-  declare dictionaryUrl: string;
+  declare editorType: "input" | "textarea";
+  /** 每页候选数，默认 5 */
+  declare pageSize: number;
   /** 是否启用 IME 拦截 */
   declare enabled: boolean;
-  /** 每页候选数 */
-  declare pageSize: number;
+  /** 词典加载函数，返回词典或 Promise；初始化时执行，resolve 前候选框 loading */
+  declare getDictionary?: GetDictionaryFn;
 
-  private readonly inputRef = createRef<HTMLInputElement | HTMLTextAreaElement>();
+  private readonly inputRef =
+    createRef<HTMLInputElement | HTMLTextAreaElement>();
 
   private _controller: PinyinIMEController<
     HTMLInputElement | HTMLTextAreaElement
   > | null = null;
 
   private _unsub: (() => void) | null = null;
-  private _urlEngine: PinyinEngine | null = null;
+  private _customEngine: PinyinEngine | null = null;
+  private _dictionaryState: DictionaryState = "idle";
   private _position: PopupPosition | null = null;
   private _onWinResize = (): void => {
     this._syncPosition();
@@ -65,18 +87,16 @@ export class PinyinIMEEditor extends LitElement {
   constructor() {
     super();
     this.value = "";
-    this.variant = "input";
-    this.dictionaryUrl = "";
+    this.editorType = "input";
     this.enabled = true;
-    this.pageSize = 3;
+    this.pageSize = 5;
   }
 
   /**
    * @returns 当前用于匹配的引擎
    */
   private _resolvedEngine(): PinyinEngine | null {
-    if (this.dictionaryUrl) return this._urlEngine;
-    return defaultPinyinEngine;
+    return this._customEngine;
   }
 
   /**
@@ -94,29 +114,56 @@ export class PinyinIMEEditor extends LitElement {
   }
 
   /**
-   * 异步加载 `dictionaryUrl` 指向的词典。
+   * 从宿主收集需透传到内部 input/textarea 的 attributes。
    */
-  private async _reloadDictionary(): Promise<void> {
-    if (!this.dictionaryUrl) {
-      this._urlEngine = null;
-      this._controller?.setOptions({ getEngine: () => this._resolvedEngine() });
-      this.requestUpdate();
-      return;
+  private _getPassThroughAttributes(): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    for (let i = 0; i < this.attributes.length; i++) {
+      const a = this.attributes[i];
+      if (!RESERVED_ATTRIBUTES.has(a.name)) {
+        attrs[a.name] = a.value;
+      }
     }
-    try {
-      const d = await loadGooglePinyinDictFromUrl(this.dictionaryUrl);
-      this._urlEngine = createPinyinEngine(d);
-    } catch {
-      this._urlEngine = null;
-    }
-    this._controller?.setOptions({ getEngine: () => this._resolvedEngine() });
-    this.requestUpdate();
+    return attrs;
+  }
+
+  /**
+   * 加载词典：getDictionary 非空则调用（远程），否则动态 import 本地词典。
+   */
+  private _loadDictionary(): void {
+    this._dictionaryState = "loading";
+    this._customEngine = null;
+
+    const loadFromRemote = (): Promise<GooglePinyinDict> =>
+      Promise.resolve(this.getDictionary!());
+
+    const loadFromLocal = (): Promise<GooglePinyinDict> =>
+      import("./dict").then((m) => m.dict);
+
+    const load = this.getDictionary ? loadFromRemote() : loadFromLocal();
+
+    load
+      .then((dict) => {
+        const engine = createPinyinEngine(dict);
+        this._customEngine = engine;
+        registerDefaultEngine(engine);
+        this._dictionaryState = "ready";
+      })
+      .catch(() => {
+        this._customEngine = null;
+        this._dictionaryState = "error";
+      })
+      .finally(() => {
+        this._controller?.setOptions({ getEngine: () => this._resolvedEngine() });
+        this.requestUpdate();
+      });
   }
 
   override connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("resize", this._onWinResize);
     window.addEventListener("scroll", this._onWinResize, true);
+    this._loadDictionary();
   }
 
   override disconnectedCallback(): void {
@@ -129,8 +176,8 @@ export class PinyinIMEEditor extends LitElement {
   }
 
   override willUpdate(changedProperties: PropertyValues<this>): void {
-    if (changedProperties.has("dictionaryUrl")) {
-      void this._reloadDictionary();
+    if (changedProperties.has("getDictionary")) {
+      this._loadDictionary();
     }
   }
 
@@ -142,18 +189,7 @@ export class PinyinIMEEditor extends LitElement {
       HTMLInputElement | HTMLTextAreaElement
     >({
       getValue: () => this.value,
-      onValueChange: (v) => {
-        this.value = v;
-        if (this.inputRef.value) this.inputRef.value.value = v;
-        this.dispatchEvent(
-          new CustomEvent<PinyinIMEChangeDetail>("pinyin-ime-change", {
-            detail: { value: v },
-            bubbles: true,
-            composed: true,
-          })
-        );
-        this.requestUpdate();
-      },
+      onValueChange: (v) => this._onValueChange(v),
       getElement: () => this.inputRef.value ?? null,
       getEngine: () => this._resolvedEngine(),
       enabled: this.enabled,
@@ -173,10 +209,23 @@ export class PinyinIMEEditor extends LitElement {
     );
     el.addEventListener(
       "keydown",
-      (e: Event) =>
-        this._controller?.handleKeyDown(e as KeyboardEvent),
+      (e: Event) => this._controller?.handleKeyDown(e as KeyboardEvent),
       true
     );
+  }
+
+  private _onValueChange(v: string): void {
+    this.value = v;
+    const el = this.inputRef.value;
+    if (el) el.value = v;
+    this.dispatchEvent(
+      new CustomEvent<PinyinIMEChangeDetail>("change", {
+        detail: { value: v },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    this.requestUpdate();
   }
 
   override updated(changedProperties: PropertyValues<this>): void {
@@ -187,18 +236,7 @@ export class PinyinIMEEditor extends LitElement {
     ) {
       this._controller?.setOptions({
         getValue: () => this.value,
-        onValueChange: (v) => {
-          this.value = v;
-          if (this.inputRef.value) this.inputRef.value.value = v;
-          this.dispatchEvent(
-            new CustomEvent<PinyinIMEChangeDetail>("pinyin-ime-change", {
-              detail: { value: v },
-              bubbles: true,
-              composed: true,
-            })
-          );
-          this.requestUpdate();
-        },
+        onValueChange: (v) => this._onValueChange(v),
         getElement: () => this.inputRef.value ?? null,
         getEngine: () => this._resolvedEngine(),
         enabled: this.enabled,
@@ -207,15 +245,19 @@ export class PinyinIMEEditor extends LitElement {
     }
 
     const inputEl = this.inputRef.value;
-    if (inputEl && inputEl.value !== this.value) {
-      inputEl.value = this.value;
+    if (inputEl) {
+      if (inputEl.value !== this.value) {
+        inputEl.value = this.value;
+      }
+      const passThrough = this._getPassThroughAttributes();
+      for (const [name, value] of Object.entries(passThrough)) {
+        inputEl.setAttribute(name, value);
+      }
     }
   }
 
   /**
    * 选词或翻页时调用控制器。
-   *
-   * @param item - 候选项
    */
   private _onSelect(item: CandidateItem): void {
     this._controller?.selectCandidate(item);
@@ -233,10 +275,10 @@ export class PinyinIMEEditor extends LitElement {
     const show =
       snap?.hasActiveComposition &&
       this._position != null &&
-      (snap.pinyinInput.length > 0);
+      snap.pinyinInput.length > 0;
 
     const field =
-      this.variant === "textarea"
+      this.editorType === "textarea"
         ? html`<textarea
             ${ref(this.inputRef)}
             class="pinyin-ime-textarea"
@@ -261,14 +303,7 @@ export class PinyinIMEEditor extends LitElement {
   private _onNativeInput(e: Event): void {
     const t = e.target as HTMLInputElement;
     if (t.value !== this.value) {
-      this.value = t.value;
-      this.dispatchEvent(
-        new CustomEvent<PinyinIMEChangeDetail>("pinyin-ime-change", {
-          detail: { value: t.value },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      this._onValueChange(t.value);
     }
   }
 
@@ -276,6 +311,8 @@ export class PinyinIMEEditor extends LitElement {
     const c = this._controller;
     const position = this._position;
     if (!c || !position) return nothing;
+
+    const loading = this._dictionaryState === "loading";
     const {
       pinyinInput,
       pinyinCursorPosition,
@@ -290,37 +327,48 @@ export class PinyinIMEEditor extends LitElement {
 
     return html`
       <div
+        part="popup"
         class="pinyin-ime-popup"
         style="top: ${position.top}px; left: ${position.left}px; width: ${position.width}px; transform: translateY(-100%) translateY(-2px);"
       >
-        <div class="pinyin-ime-pinyin-bar">
+        <div part="pinyin-bar" class="pinyin-ime-pinyin-bar">
           ${pinyinInput.substring(0, pinyinCursorPosition)}<span
+            part="cursor"
             class="pinyin-ime-cursor"
           ></span
           >${pinyinInput.substring(pinyinCursorPosition)}
         </div>
-        <div class="pinyin-ime-candidate-list">
-          ${displayCandidates.length > 0
-            ? displayCandidates.map(
-                (item, idx) => html`
-                  <div
-                    class="pinyin-ime-candidate-row"
-                    role="option"
-                    @mousedown=${(e: MouseEvent) => {
-                      e.preventDefault();
-                      this._onSelect(item);
-                    }}
-                  >
-                    <span class="pinyin-ime-candidate-index">${idx + 1}.</span>
-                    <span class="pinyin-ime-candidate-text">${item.word}</span>
-                  </div>
-                `
-              )
-            : html`<div class="pinyin-ime-empty">无候选词</div>`}
+        <div part="candidate-list" class="pinyin-ime-candidate-list">
+          ${loading
+            ? html`<div part="loading" class="pinyin-ime-loading"
+                >加载中…</div
+              >`
+            : displayCandidates.length > 0
+              ? displayCandidates.map(
+                  (item, idx) => html`
+                    <div
+                      part="candidate-row"
+                      class="pinyin-ime-candidate-row"
+                      role="option"
+                      @mousedown=${(e: MouseEvent) => {
+                        e.preventDefault();
+                        this._onSelect(item);
+                      }}
+                    >
+                      <span part="candidate-index" class="pinyin-ime-candidate-index"
+                        >${idx + 1}.</span
+                      >
+                      <span part="candidate-text" class="pinyin-ime-candidate-text"
+                        >${item.word}</span
+                      >
+                    </div>
+                  `
+                )
+              : html`<div part="empty" class="pinyin-ime-empty">无候选词</div>`}
         </div>
-        ${candidates.length > pageSize
+        ${!loading && candidates.length > pageSize
           ? html`
-              <div class="pinyin-ime-footer">
+              <div part="footer" class="pinyin-ime-footer">
                 <div class="pinyin-ime-footer-nav">
                   <span
                     class="pinyin-ime-page-link ${!hasPrev

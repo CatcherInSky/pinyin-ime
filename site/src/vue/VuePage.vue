@@ -1,25 +1,74 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { getDemoRoutes } from "../common/demo-routes";
 import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
+
+type DictEntry = { w: string; f: number };
+type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinHostEl = HTMLElement & {
+  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+};
+
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+
+const VUE_CDN_CODE = `<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+type DictEntry = { w: string; f: number };
+type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinHostEl = HTMLElement & {
+  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+};
+
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const editorRef = ref<PinyinHostEl | null>(null);
+
+onMounted(() => {
+  const el = editorRef.value;
+  if (!el) return;
+  el.getDictionary = async () => {
+    const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+      dict: GooglePinyinDict;
+    };
+    return mod.dict;
+  };
+});
+<\/script>
+
+<template>
+  <pinyin-ime-editor ref="editorRef" editor-type="textarea" />
+<\/template>`;
+const VUE_LOCAL_CODE = `<script setup lang="ts">
+import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+<\/script>
+
+<template>
+  <!-- 本地词典（默认行为）：不设置 getDictionary -->
+  <pinyin-ime-editor />
+<\/template>`;
 
 const r = getDemoRoutes();
 
 const textInput = ref("");
 const textTextarea = ref("");
+const editorInputRef = ref<PinyinHostEl | null>(null);
+const editorTextareaRef = ref<PinyinHostEl | null>(null);
 
 const SHORTCUT_LINES = [
   "字母 a–z：写入拼音缓冲",
   "空格：选第一候选；无候选则上屏拼音",
-  "1–n：选当前页第 n 个候选（默认每页 3 条，最大 9）",
+  "1–n：选当前页第 n 个候选（默认每页 5 条，最大 9）",
   "= / . / 小键盘 +：下一页；- / , / 小键盘 -：上一页",
   "左右方向键：拼音串内移动光标",
   "Enter：上屏拼音；Escape：清空缓冲",
 ] as const;
 
 /**
- * @param e - 自定义事件 `pinyin-ime-change`
+ * @param e - 自定义事件 `change`
  */
 function onInputChange(e: Event) {
   const ce = e as CustomEvent<{ value: string }>;
@@ -27,12 +76,37 @@ function onInputChange(e: Event) {
 }
 
 /**
- * @param e - 自定义事件 `pinyin-ime-change`
+ * @param e - 自定义事件 `change`
  */
 function onTextareaChange(e: Event) {
   const ce = e as CustomEvent<{ value: string }>;
   textTextarea.value = ce.detail.value;
 }
+
+/**
+ * Loads dictionary module from CDN and returns exported dict.
+ *
+ * @returns Promise of Google pinyin dictionary
+ */
+async function loadCdnDict(): Promise<GooglePinyinDict> {
+  const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+    dict: GooglePinyinDict;
+  };
+  return mod.dict;
+}
+
+/**
+ * Assigns getDictionary function to demo editors after mount.
+ */
+function bindDictionaryLoader(): void {
+  if (editorTextareaRef.value) {
+    editorTextareaRef.value.getDictionary = loadCdnDict;
+  }
+}
+
+onMounted(() => {
+  bindDictionaryLoader();
+});
 </script>
 
 <template>
@@ -71,22 +145,25 @@ function onTextareaChange(e: Event) {
 
     <section class="space-y-2">
       <h2 class="text-lg font-semibold">单行（默认 input）</h2>
-      <pinyin-ime-editor :value="textInput" @pinyin-ime-change="onInputChange" />
+      <pinyin-ime-editor ref="editorInputRef" :value="textInput" @change="onInputChange" />
       <p class="text-xs text-muted-foreground">
         受控值：<span class="font-mono">{{ JSON.stringify(textInput) }}</span>
       </p>
+      <pre class="overflow-x-auto rounded bg-muted/40 p-3 text-xs"><code>{{ VUE_LOCAL_CODE }}</code></pre>
     </section>
 
     <section class="space-y-2">
-      <h2 class="text-lg font-semibold">多行（variant=&quot;textarea&quot;）</h2>
+      <h2 class="text-lg font-semibold">多行（editor-type=&quot;textarea&quot;）</h2>
       <pinyin-ime-editor
-        variant="textarea"
+        ref="editorTextareaRef"
+        editor-type="textarea"
         :value="textTextarea"
-        @pinyin-ime-change="onTextareaChange"
+        @change="onTextareaChange"
       />
       <p class="text-xs text-muted-foreground">
         受控值：<span class="font-mono">{{ JSON.stringify(textTextarea) }}</span>
       </p>
+      <pre class="overflow-x-auto rounded bg-muted/40 p-3 text-xs"><code>{{ VUE_CDN_CODE }}</code></pre>
     </section>
 
     <section class="rounded-md border border-border bg-muted/40 p-4 text-sm">
@@ -95,5 +172,6 @@ function onTextareaChange(e: Event) {
         <li v-for="line in SHORTCUT_LINES" :key="line">{{ line }}</li>
       </ul>
     </section>
+
   </main>
 </template>

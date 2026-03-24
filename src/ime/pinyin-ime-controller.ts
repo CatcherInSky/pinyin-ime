@@ -1,13 +1,13 @@
 /**
  * @file pinyin-ime-controller.ts
- * @description 与 DOM 解耦的拼音 IME 状态机（原生 `KeyboardEvent` / `InputEvent`），供 React Hook 与 Lit 组件共用。
+ * @description 与 DOM 解耦的拼音 IME 状态机（原生 `KeyboardEvent` / `InputEvent`），供 Lit 组件 `pinyin-ime-editor` 使用。
  */
 
 import type { CandidateItem } from "../engine/pinyin-engine";
 import type { PinyinEngine } from "../engine/pinyin-engine";
 
 /** 默认每页候选数量（与数字键 1–9 一致） */
-export const IME_PAGE_SIZE = 3;
+export const IME_PAGE_SIZE = 5;
 
 /**
  * 将每页条数限制在 1–9，以便用单个数字键选词。

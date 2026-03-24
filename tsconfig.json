@@ -4,7 +4,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
@@ -17,10 +16,8 @@
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx",
     "dictionary/**/*.ts",
     "tests/**/*.ts",
-    "tests/**/*.tsx",
     "scripts/**/*.ts",
     "tsup.config.ts",
     "vitest.config.ts"

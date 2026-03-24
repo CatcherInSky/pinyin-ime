@@ -14,7 +14,8 @@ declare global {
       "pinyin-ime-editor": DetailedHTMLProps<
         HTMLAttributes<HTMLElement> & {
           value?: string;
-          variant?: "input" | "textarea";
+          "editor-type"?: "input" | "textarea";
+          "page-size"?: number;
         },
         HTMLElement
       >;

@@ -1,7 +1,20 @@
 /**
  * 默认样式（无前缀框架）；与 `defaultPinyinPopupClassNames` / 输入框默认 class 对应。
  * 发布时复制到 `dist/pinyin-ime.css`。
+ * 支持 CSS 变量覆盖：--pinyin-ime-border-color、--pinyin-ime-focus-border 等。
  */
+
+:host {
+  --pinyin-ime-border-color: #d4d4d8;
+  --pinyin-ime-focus-border: #3b82f6;
+  --pinyin-ime-focus-shadow: rgba(59, 130, 246, 0.25);
+  --pinyin-ime-popup-bg: #fff;
+  --pinyin-ime-popup-border: #e4e4e7;
+  --pinyin-ime-cursor-color: #2563eb;
+  --pinyin-ime-hover-bg: #f4f4f5;
+  --pinyin-ime-text-color: #18181b;
+  --pinyin-ime-muted-color: #71717a;
+}
 
 .pinyin-ime-field-wrap {
   position: relative;
@@ -12,10 +25,10 @@
 .pinyin-ime-textarea {
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid #d4d4d8;
+  border: 1px solid var(--pinyin-ime-border-color);
   border-radius: 0.375rem;
-  background: #fff;
-  color: #18181b;
+  background: var(--pinyin-ime-popup-bg);
+  color: var(--pinyin-ime-text-color);
   font-size: 0.875rem;
   line-height: 1.25rem;
   padding: 0.5rem 0.75rem;
@@ -30,13 +43,13 @@
 
 .pinyin-ime-input::placeholder,
 .pinyin-ime-textarea::placeholder {
-  color: #71717a;
+  color: var(--pinyin-ime-muted-color);
 }
 
 .pinyin-ime-input:focus-visible,
 .pinyin-ime-textarea:focus-visible {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  border-color: var(--pinyin-ime-focus-border);
+  box-shadow: 0 0 0 2px var(--pinyin-ime-focus-shadow);
 }
 
 .pinyin-ime-input:disabled,
@@ -52,9 +65,9 @@
   flex-direction: column;
   min-width: 8rem;
   border-radius: 0.375rem;
-  border: 1px solid #e4e4e7;
-  background: #fff;
-  color: #18181b;
+  border: 1px solid var(--pinyin-ime-popup-border);
+  background: var(--pinyin-ime-popup-bg);
+  color: var(--pinyin-ime-text-color);
   font-size: 0.75rem;
   line-height: 1rem;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -64,8 +77,8 @@
 .pinyin-ime-pinyin-bar {
   flex-shrink: 0;
   margin-bottom: 2px;
-  border-bottom: 1px solid #e4e4e7;
-  background: #f4f4f5;
+  border-bottom: 1px solid var(--pinyin-ime-popup-border);
+  background: var(--pinyin-ime-hover-bg);
   padding: 2px 4px;
   font-family: ui-monospace, monospace;
   font-size: 10px;
@@ -77,7 +90,7 @@
   width: 1px;
   margin: 0 1px;
   vertical-align: middle;
-  background: #2563eb;
+  background: var(--pinyin-ime-cursor-color);
   animation: pinyin-ime-caret-blink 1s step-end infinite;
 }
 
@@ -97,7 +110,7 @@
 }
 
 .pinyin-ime-candidate-row:hover {
-  background: #f4f4f5;
+  background: var(--pinyin-ime-hover-bg);
 }
 
 .pinyin-ime-candidate-index {
@@ -106,18 +119,19 @@
   flex-shrink: 0;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #71717a;
+  color: var(--pinyin-ime-muted-color);
 }
 
 .pinyin-ime-candidate-text {
   font-size: 11px;
 }
 
-.pinyin-ime-empty {
+.pinyin-ime-empty,
+.pinyin-ime-loading {
   padding: 4px;
   font-size: 10px;
   font-style: italic;
-  color: #71717a;
+  color: var(--pinyin-ime-muted-color);
 }
 
 .pinyin-ime-footer {
@@ -126,10 +140,10 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid #e4e4e7;
+  border-top: 1px solid var(--pinyin-ime-popup-border);
   padding: 4px;
   font-size: 10px;
-  color: #71717a;
+  color: var(--pinyin-ime-muted-color);
   user-select: none;
 }
 
@@ -149,7 +163,7 @@
 }
 
 .pinyin-ime-page-link:hover {
-  color: #18181b;
+  color: var(--pinyin-ime-text-color);
 }
 
 .pinyin-ime-page-link--disabled {

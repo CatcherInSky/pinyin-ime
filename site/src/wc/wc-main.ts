@@ -3,6 +3,59 @@ import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 import { getDemoRoutes } from "../common/demo-routes";
 
+/** 词典条目结构（与库内 `GooglePinyinDict` 同形）。 */
+type DictEntry = { w: string; f: number };
+
+/** 词典对象结构。 */
+type GooglePinyinDict = Record<string, DictEntry[]>;
+
+/** 带 `getDictionary` 属性的 pinyin-ime 宿主元素类型。 */
+type PinyinImeHostEl = HTMLElement & {
+  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+};
+
+/** 远程词典 CDN 地址（示例固定版本）。 */
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+
+/** Web Component 本地 input 示例代码。 */
+const WC_LOCAL_INPUT_CODE = `import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+const el = document.createElement("pinyin-ime-editor");
+document.body.append(el);`;
+
+/** Web Component 本地 textarea 示例代码。 */
+const WC_LOCAL_TEXTAREA_CODE = `import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+const el = document.createElement("pinyin-ime-editor");
+el.setAttribute("editor-type", "textarea");
+document.body.append(el);`;
+
+/** Web Component CDN 词典示例代码。 */
+const WC_CDN_CODE = `import "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const el = document.createElement("pinyin-ime-editor");
+el.getDictionary = async () => {
+  const mod = await import(/* @vite-ignore */ CDN_DICT_URL);
+  return mod.dict;
+};
+document.body.append(el);`;
+
+/**
+ * 通过 ESM 动态 import 从 CDN 获取词典模块。
+ *
+ * @returns 远程 `dict` 对象
+ */
+async function loadCdnDict(): Promise<GooglePinyinDict> {
+  const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+    dict: GooglePinyinDict;
+  };
+  return mod.dict;
+}
+
 /**
  * Appends top navigation with the current page highlighted.
  *
@@ -48,7 +101,7 @@ function appendShortcuts(parent: HTMLElement) {
   const lines = [
     "字母 a–z：写入拼音缓冲",
     "空格：选第一候选；无候选则上屏拼音",
-    "1–n：选当前页第 n 个候选（默认每页 3 条，最大 9）",
+    "1–n：选当前页第 n 个候选（默认每页 5 条，最大 9）",
     "= / . / 小键盘 +：下一页；- / , / 小键盘 -：上一页",
     "左右方向键：拼音串内移动光标",
     "Enter：上屏拼音；Escape：清空缓冲",
@@ -60,6 +113,21 @@ function appendShortcuts(parent: HTMLElement) {
   }
   section.appendChild(ul);
   parent.appendChild(section);
+}
+
+/**
+ * Appends a formatted code block under current section.
+ *
+ * @param parent - Section container
+ * @param code - Full demo code snippet
+ */
+function appendCodeBlock(parent: HTMLElement, code: string): void {
+  const pre = document.createElement("pre");
+  pre.className = "overflow-x-auto rounded bg-muted/40 p-3 text-xs";
+  const codeEl = document.createElement("code");
+  codeEl.textContent = code;
+  pre.appendChild(codeEl);
+  parent.appendChild(pre);
 }
 
 /**
@@ -82,7 +150,7 @@ function main() {
   const intro = document.createElement("p");
   intro.className = "mt-2 text-sm text-muted-foreground";
   intro.textContent =
-    "引入 pinyin-ime 注册自定义元素后，用 document.createElement(\"pinyin-ime-editor\") 挂载；设置 property variant 为 \"textarea\" 使用多行宿主。";
+    "引入 pinyin-ime 注册自定义元素后，用 document.createElement(\"pinyin-ime-editor\") 挂载；设置 editor-type 为 \"textarea\" 使用多行宿主。";
   head.appendChild(intro);
   mainEl.appendChild(head);
 
@@ -96,34 +164,62 @@ function main() {
   const editorInput = document.createElement("pinyin-ime-editor");
   const outInput = document.createElement("p");
   outInput.className = "text-xs text-muted-foreground";
-  editorInput.addEventListener("pinyin-ime-change", (e) => {
+  editorInput.addEventListener("change", (e) => {
     const v = (e as CustomEvent<{ value: string }>).detail.value;
     outInput.textContent = `受控值：${JSON.stringify(v)}`;
   });
   holderInput.appendChild(editorInput);
   sectionInput.appendChild(holderInput);
   sectionInput.appendChild(outInput);
+  appendCodeBlock(sectionInput, WC_LOCAL_INPUT_CODE);
   mainEl.appendChild(sectionInput);
 
   const sectionTa = document.createElement("section");
   sectionTa.className = "space-y-2";
   const h2Ta = document.createElement("h2");
   h2Ta.className = "text-lg font-semibold";
-  h2Ta.textContent = "多行（variant = \"textarea\"）";
+  h2Ta.textContent = "多行（editor-type = \"textarea\"）";
   sectionTa.appendChild(h2Ta);
   const holderTa = document.createElement("div");
   const editorTa = document.createElement("pinyin-ime-editor");
-  editorTa.setAttribute("variant", "textarea");
+  editorTa.setAttribute("editor-type", "textarea");
   const outTa = document.createElement("p");
   outTa.className = "text-xs text-muted-foreground";
-  editorTa.addEventListener("pinyin-ime-change", (e) => {
+  editorTa.addEventListener("change", (e) => {
     const v = (e as CustomEvent<{ value: string }>).detail.value;
     outTa.textContent = `受控值：${JSON.stringify(v)}`;
   });
   holderTa.appendChild(editorTa);
   sectionTa.appendChild(holderTa);
   sectionTa.appendChild(outTa);
+  appendCodeBlock(sectionTa, WC_LOCAL_TEXTAREA_CODE);
   mainEl.appendChild(sectionTa);
+
+  const sectionRemote = document.createElement("section");
+  sectionRemote.className = "space-y-2";
+  const h2Remote = document.createElement("h2");
+  h2Remote.className = "text-lg font-semibold";
+  h2Remote.textContent = "远程词典（getDictionary + CDN dict.js）";
+  sectionRemote.appendChild(h2Remote);
+  const remoteTip = document.createElement("p");
+  remoteTip.className = "text-xs text-muted-foreground";
+  remoteTip.textContent =
+    "示例从 jsDelivr 动态加载 https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js 并通过 getDictionary 注入。";
+  sectionRemote.appendChild(remoteTip);
+  const holderRemote = document.createElement("div");
+  const editorRemote = document.createElement("pinyin-ime-editor") as PinyinImeHostEl;
+  editorRemote.getDictionary = loadCdnDict;
+  const outRemote = document.createElement("p");
+  outRemote.className = "text-xs text-muted-foreground";
+  editorRemote.addEventListener("change", (e) => {
+    const v = (e as CustomEvent<{ value: string }>).detail.value;
+    outRemote.textContent = `受控值：${JSON.stringify(v)}`;
+  });
+  holderRemote.appendChild(editorRemote);
+  sectionRemote.appendChild(holderRemote);
+  sectionRemote.appendChild(outRemote);
+  appendCodeBlock(sectionRemote, WC_CDN_CODE);
+  mainEl.appendChild(sectionRemote);
 
   appendShortcuts(mainEl);
   root.appendChild(mainEl);
