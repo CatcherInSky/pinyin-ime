@@ -25,10 +25,10 @@ const SHORTCUT_LINES = [
 
 /** Lit 宿主上的受控 `value` 与自定义事件。 */
 type DictEntry = { w: string; f: number };
-type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
   value: string;
-  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
   popupPosition?: PopupPlacement;
 };
 
@@ -39,9 +39,9 @@ import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
 type DictEntry = { w: string; f: number };
-type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
-  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
 const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
@@ -54,7 +54,7 @@ function TextareaWithCdnDict() {
     if (!el) return;
     el.getDictionary = async () => {
       const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-        dict: GooglePinyinDict;
+        dict: PinyinDict;
       };
       return mod.dict;
     };
@@ -75,9 +75,9 @@ function InputWithLocalDict() {
  *
  * @returns Promise of Google pinyin dictionary
  */
-async function loadCdnDict(): Promise<GooglePinyinDict> {
+async function loadCdnDict(): Promise<PinyinDict> {
   const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-    dict: GooglePinyinDict;
+    dict: PinyinDict;
   };
   return mod.dict;
 }

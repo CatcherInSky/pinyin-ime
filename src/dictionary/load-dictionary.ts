@@ -1,12 +1,12 @@
 /**
  * @file load-dictionary.ts
- * @description 从 URL 异步加载与 {@link GooglePinyinDict} 同形的 JSON 词典。
+ * @description 从 URL 异步加载与 {@link PinyinDict} 同形的 JSON 词典。
  */
 
-import type { DictEntry, GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
+import type { DictEntry, PinyinDict } from "../types/dist";
 
 /**
- * 在 {@link loadGooglePinyinDictFromUrl} 失败时抛出，便于调用方区分网络/解析错误。
+ * 在 {@link loadPinyinDictFromUrl} 失败时抛出，便于调用方区分网络/解析错误。
  */
 export class DictionaryLoadError extends Error {
   /**
@@ -20,13 +20,13 @@ export class DictionaryLoadError extends Error {
 }
 
 /**
- * 校验从网络解析出的对象是否为可用的 {@link GooglePinyinDict}。
+ * 校验从网络解析出的对象是否为可用的 {@link PinyinDict}。
  *
  * @param data - 未知 JSON 值
  * @returns 类型收窄后的词典
  * @throws DictionaryLoadError 若结构非法
  */
-export function assertGooglePinyinDictShape(data: unknown): GooglePinyinDict {
+export function assertPinyinDictShape(data: unknown): PinyinDict {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new DictionaryLoadError("Dictionary JSON must be a plain object");
   }
@@ -52,7 +52,7 @@ export function assertGooglePinyinDictShape(data: unknown): GooglePinyinDict {
       }
     }
   }
-  return o as GooglePinyinDict;
+  return o as PinyinDict;
 }
 
 /**
@@ -60,13 +60,13 @@ export function assertGooglePinyinDictShape(data: unknown): GooglePinyinDict {
  *
  * @param url - 词典地址
  * @param init - 可选 `fetch` 选项（头、缓存等）
- * @returns 解析并校验后的 {@link GooglePinyinDict}
+ * @returns 解析并校验后的 {@link PinyinDict}
  * @throws DictionaryLoadError 当 HTTP 非成功、非 JSON 或结构非法时
  */
-export async function loadGooglePinyinDictFromUrl(
+export async function loadPinyinDictFromUrl(
   url: string,
   init?: RequestInit
-): Promise<GooglePinyinDict> {
+): Promise<PinyinDict> {
   let res: Response;
   try {
     res = await fetch(url, init);
@@ -86,5 +86,5 @@ export async function loadGooglePinyinDictFromUrl(
       cause: e,
     });
   }
-  return assertGooglePinyinDictShape(json);
+  return assertPinyinDictShape(json);
 }

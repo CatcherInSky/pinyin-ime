@@ -11,8 +11,8 @@ export type {
 } from "./pinyin-engine";
 export { createPinyinEngine } from "./pinyin-engine";
 export {
-  loadGooglePinyinDictFromUrl,
-  assertGooglePinyinDictShape,
+  loadPinyinDictFromUrl,
+  assertPinyinDictShape,
   DictionaryLoadError,
 } from "../dictionary/load-dictionary";
 

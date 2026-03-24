@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  loadGooglePinyinDictFromUrl,
-  assertGooglePinyinDictShape,
+  loadPinyinDictFromUrl,
+  assertPinyinDictShape,
   DictionaryLoadError,
 } from "../src/dictionary/load-dictionary";
 
-describe("assertGooglePinyinDictShape", () => {
+describe("assertPinyinDictShape", () => {
   it("accepts a valid minimal dict", () => {
     const d = { a: [{ w: "啊", f: 1 }] };
-    expect(assertGooglePinyinDictShape(d)).toEqual(d);
+    expect(assertPinyinDictShape(d)).toEqual(d);
   });
 
   it("throws DictionaryLoadError on invalid shape", () => {
-    expect(() => assertGooglePinyinDictShape(null)).toThrow(DictionaryLoadError);
-    expect(() => assertGooglePinyinDictShape({ a: "x" })).toThrow(
+    expect(() => assertPinyinDictShape(null)).toThrow(DictionaryLoadError);
+    expect(() => assertPinyinDictShape({ a: "x" })).toThrow(
       DictionaryLoadError
     );
   });
 });
 
-describe("loadGooglePinyinDictFromUrl", () => {
+describe("loadPinyinDictFromUrl", () => {
   let originalFetch: typeof fetch;
 
   beforeEach(() => {
@@ -35,7 +35,7 @@ describe("loadGooglePinyinDictFromUrl", () => {
       async () => new Response(null, { status: 404 })
     ) as typeof fetch;
     await expect(
-      loadGooglePinyinDictFromUrl("https://example.com/dict.json")
+      loadPinyinDictFromUrl("https://example.com/dict.json")
     ).rejects.toThrow(DictionaryLoadError);
   });
 
@@ -49,7 +49,7 @@ describe("loadGooglePinyinDictFromUrl", () => {
         })
     ) as typeof fetch;
     await expect(
-      loadGooglePinyinDictFromUrl("https://example.com/ok.json")
+      loadPinyinDictFromUrl("https://example.com/ok.json")
     ).resolves.toEqual(body);
   });
 });

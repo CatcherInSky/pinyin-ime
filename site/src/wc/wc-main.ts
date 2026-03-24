@@ -8,15 +8,15 @@ if (!customElements.get("pinyin-ime-editor")) {
   customElements.define("pinyin-ime-editor", PinyinIMEEditor);
 }
 
-/** 词典条目结构（与库内 `GooglePinyinDict` 同形）。 */
+/** 词典条目结构（与库内 `PinyinDict` 同形）。 */
 type DictEntry = { w: string; f: number };
 
 /** 词典对象结构。 */
-type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinDict = Record<string, DictEntry[]>;
 
 /** 带 `getDictionary` 属性的 pinyin-ime 宿主元素类型。 */
 type PinyinImeHostEl = HTMLElement & {
-  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
 /** 远程词典 CDN 地址（示例固定版本）。 */
@@ -54,9 +54,9 @@ document.body.append(el);`;
  *
  * @returns 远程 `dict` 对象
  */
-async function loadCdnDict(): Promise<GooglePinyinDict> {
+async function loadCdnDict(): Promise<PinyinDict> {
   const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-    dict: GooglePinyinDict;
+    dict: PinyinDict;
   };
   return mod.dict;
 }

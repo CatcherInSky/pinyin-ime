@@ -12,7 +12,7 @@ import {
 import { createRef, ref } from "lit/directives/ref.js";
 import { createPinyinEngine } from "./engine/pinyin";
 import { registerDefaultEngine } from "./dictionary/registry";
-import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
+import type { PinyinDict } from "./types/dist";
 import type { PinyinEngine } from "./engine/pinyin-engine";
 import type { CandidateItem } from "./engine/pinyin-engine";
 import { PinyinIMEController } from "./ime/pinyin-ime-controller";
@@ -35,8 +35,8 @@ const RESERVED_ATTRIBUTES = new Set([
  * getDictionary 函数类型：返回词典或 Promise；组件初始化时调用，resolve 前候选框显示 loading。
  */
 export type GetDictionaryFn = () =>
-  | Promise<GooglePinyinDict>
-  | GooglePinyinDict;
+  | Promise<PinyinDict>
+  | PinyinDict;
 
 /**
  * 宿主上可监听的事件：`detail.value` 为新的受控文本。
@@ -163,10 +163,10 @@ export class PinyinIMEEditor extends LitElement {
     this._dictionaryState = "loading";
     this._customEngine = null;
 
-    const loadFromRemote = (): Promise<GooglePinyinDict> =>
+    const loadFromRemote = (): Promise<PinyinDict> =>
       Promise.resolve(this.getDictionary!());
 
-    const loadFromLocal = (): Promise<GooglePinyinDict> =>
+    const loadFromLocal = (): Promise<PinyinDict> =>
       import("./dict").then((m) => m.dict);
 
     const load = this.getDictionary ? loadFromRemote() : loadFromLocal();

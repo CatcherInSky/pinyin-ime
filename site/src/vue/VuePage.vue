@@ -10,9 +10,9 @@ if (!customElements.get("pinyin-ime-editor")) {
 }
 
 type DictEntry = { w: string; f: number };
-type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
-  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
 const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
@@ -23,9 +23,9 @@ import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
 type DictEntry = { w: string; f: number };
-type GooglePinyinDict = Record<string, DictEntry[]>;
+type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
-  getDictionary?: () => Promise<GooglePinyinDict> | GooglePinyinDict;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
 const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
@@ -36,7 +36,7 @@ onMounted(() => {
   if (!el) return;
   el.getDictionary = async () => {
     const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-      dict: GooglePinyinDict;
+      dict: PinyinDict;
     };
     return mod.dict;
   };
@@ -93,9 +93,9 @@ function onTextareaChange(e: Event) {
  *
  * @returns Promise of Google pinyin dictionary
  */
-async function loadCdnDict(): Promise<GooglePinyinDict> {
+async function loadCdnDict(): Promise<PinyinDict> {
   const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-    dict: GooglePinyinDict;
+    dict: PinyinDict;
   };
   return mod.dict;
 }

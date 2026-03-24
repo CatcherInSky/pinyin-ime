@@ -3,7 +3,7 @@
  * @description 可注入字典的拼音匹配引擎（`createPinyinEngine`）。
  */
 
-import type { GooglePinyinDict } from "../../dictionary/google_pinyin_dict";
+import type { PinyinDict } from "../types/dist";
 
 /**
  * 单字母前缀递进（ztai → z）时合并词条数上限，避免与「全字典 z*」等长列表拖慢 UI。
@@ -181,10 +181,10 @@ function getKeysByPrefix(
 /**
  * 基于给定词典创建拼音引擎；同一词典可复用同一实例以避免重复构建索引。
  *
- * @param dict - 与 {@link GooglePinyinDict} 同形的记录表
+ * @param dict - 与 {@link PinyinDict} 同形的记录表
  * @returns `getCandidates` 与 `computeMatchedLength`
  */
-export function createPinyinEngine(dict: GooglePinyinDict): PinyinEngine {
+export function createPinyinEngine(dict: PinyinDict): PinyinEngine {
   const d = dict as Record<string, WordFreq[] | undefined>;
   const wordMaxFreqByWord = buildWordMaxFreqByWord(d);
   const wordKeysIndex = buildWordKeysIndex(d);

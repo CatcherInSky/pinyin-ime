@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createPinyinEngine } from "../src/engine/pinyin-engine";
-import type { GooglePinyinDict } from "../dictionary/google_pinyin_dict";
+import type { PinyinDict } from "../types/dist";
 
-const tinyDict: GooglePinyinDict = {
+const tinyDict: PinyinDict = {
   n: [
     { w: "你", f: 10 },
     { w: "泥", f: 5 },

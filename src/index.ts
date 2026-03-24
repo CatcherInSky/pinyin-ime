@@ -4,13 +4,14 @@ export type {
   PopupPosition,
   PopupPlacement,
 } from "./lib/types";
-export type { DictEntry, GooglePinyinDict } from "../dictionary/google_pinyin_dict";
+export type { DictEntry, PinyinDict } from "./types/dist";
+
 export {
   getCandidates,
   computeMatchedLength,
   createPinyinEngine,
-  loadGooglePinyinDictFromUrl,
-  assertGooglePinyinDictShape,
+  loadPinyinDictFromUrl,
+  assertPinyinDictShape,
   DictionaryLoadError,
   type CandidateItem,
   type PinyinMatchResult,
