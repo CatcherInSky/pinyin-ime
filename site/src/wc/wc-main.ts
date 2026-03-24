@@ -1,7 +1,12 @@
 import "../common/index.css";
-import "pinyin-ime";
+import { PinyinIMEEditor } from "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 import { getDemoRoutes } from "../common/demo-routes";
+
+/** 兜底注册自定义元素，避免依赖包副作用导入被裁剪后组件未定义。 */
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
 
 /** 词典条目结构（与库内 `GooglePinyinDict` 同形）。 */
 type DictEntry = { w: string; f: number };

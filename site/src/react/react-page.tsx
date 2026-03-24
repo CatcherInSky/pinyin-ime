@@ -1,9 +1,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
-import "pinyin-ime";
+import { PinyinIMEEditor } from "pinyin-ime";
 import { getDemoRoutes } from "../common/demo-routes";
 import "pinyin-ime/pinyin-ime.css";
 import "../common/index.css";
+
+/** 兜底注册自定义元素，避免依赖包副作用导入被裁剪后组件未定义。 */
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
 
 /** 快捷键说明文案（与其它演示页一致）。 */
 const SHORTCUT_LINES = [

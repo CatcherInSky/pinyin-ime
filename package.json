@@ -23,6 +23,8 @@
     "LICENSE"
   ],
   "sideEffects": [
+    "./dist/index.js",
+    "./dist/dict.js",
     "./dist/pinyin-ime.css"
   ],
   "scripts": {

@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { getDemoRoutes } from "../common/demo-routes";
-import "pinyin-ime";
+import { PinyinIMEEditor } from "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
+
+/** 兜底注册自定义元素，避免依赖包副作用导入被裁剪后组件未定义。 */
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
 
 type DictEntry = { w: string; f: number };
 type GooglePinyinDict = Record<string, DictEntry[]>;
