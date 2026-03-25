@@ -1,6 +1,6 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, readdirSync, unlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { copyFileSync, unlinkSync } from "node:fs";
+import { resolve } from "node:path";
 
 const minify = {
   minifyWhitespace: true,
@@ -9,19 +9,9 @@ const minify = {
 } as const;
 
 /**
- * 删除词典子目录中的 `.d.ts`（仅保留压缩后的 `js` / `js.map`），并移除已废弃的 `dict` 产物。
+ * 移除已废弃的顶层 `dict` 产物；词典子路径保留 `.d.ts` 供 `exports.types` 解析。
  */
 function cleanupDistArtifacts(): void {
-  const dictDir = resolve("dist/dictionary");
-  try {
-    for (const name of readdirSync(dictDir)) {
-      if (name.endsWith(".d.ts")) {
-        unlinkSync(join(dictDir, name));
-      }
-    }
-  } catch {
-    // 目录可能尚不存在
-  }
   for (const name of ["dict.js", "dict.js.map", "dict.d.ts"]) {
     try {
       unlinkSync(resolve("dist", name));
@@ -59,7 +49,7 @@ export default defineConfig([
       "dictionary/dota2_pinyin_dict": "dictionary/dota2_pinyin_dict.ts",
     },
     format: ["esm"],
-    dts: false,
+    dts: true,
     sourcemap: true,
     clean: false,
     outDir: "dist",
