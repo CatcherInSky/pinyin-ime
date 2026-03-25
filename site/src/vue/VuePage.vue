@@ -15,7 +15,8 @@ type PinyinHostEl = HTMLElement & {
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
-const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const CDN_DICT_URL =
+  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
 
 const VUE_CDN_CODE = `<script setup lang="ts">
 import { onMounted, ref } from "vue";
@@ -28,7 +29,8 @@ type PinyinHostEl = HTMLElement & {
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
-const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const CDN_DICT_URL =
+  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
 const editorRef = ref<PinyinHostEl | null>(null);
 
 onMounted(() => {

@@ -1,5 +1,54 @@
-import { PinyinDict } from "../src";
-import { dict as GoogleDist } from './google_pinyin_dict'
+import type { DictEntry, PinyinDict } from "../src/types/dist";
+import { dict as GoogleDist } from "./google_pinyin_dict";
+/**
+ * 合并同一拼音 key 下的多条 {@link DictEntry} 列表；同一 `w` 保留全局最大 `f`。
+ *
+ * @param groups - 若干条目列表（可含 `undefined`）
+ * @returns 按 `f` 降序排列的合并列表
+ */
+function mergeDictEntryGroups(
+  ...groups: (DictEntry[] | undefined)[]
+): DictEntry[] {
+  const byWord = new Map<string, number>();
+  for (const g of groups) {
+    if (!g) continue;
+    for (const { w, f } of g) {
+      const prev = byWord.get(w);
+      if (prev === undefined || f > prev) {
+        byWord.set(w, f);
+      }
+    }
+  }
+  return Array.from(byWord.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([w, f]) => ({ w, f }));
+}
+
+/**
+ * 合并多个 {@link PinyinDict}：对每个 key 合并其 value 数组；重复词条取较大 `f`。
+ *
+ * @param dicts - 至少一个词典
+ * @returns 新的顶层对象（不修改入参）
+ */
+export function mergePinyinDicts(...dicts: PinyinDict[]): PinyinDict {
+  if (dicts.length === 0) {
+    return {};
+  }
+  const keys = new Set<string>();
+  for (const d of dicts) {
+    for (const k of Object.keys(d)) {
+      keys.add(k);
+    }
+  }
+  const out: PinyinDict = {};
+  for (const key of keys) {
+    const merged = mergeDictEntryGroups(...dicts.map((d) => d[key]));
+    if (merged.length > 0) {
+      out[key] = merged;
+    }
+  }
+  return out;
+}
 const dota2Dist: PinyinDict = {
   // 英雄
   arzsj: [{ w: "矮人直升机", f: 980000 }],
@@ -200,4 +249,4 @@ const dota2Dist: PinyinDict = {
   yequ: [{ w: "野区", f: 960000 }],
   daye: [{ w: '打野', f: 970000 }],
 };
-export const dict = Object.assign(dota2Dist, GoogleDist)
+export const dict = mergePinyinDicts(GoogleDist, dota2Dist);

@@ -44,7 +44,10 @@ export type GetDictionaryFn = () =>
 export type PinyinIMEChangeDetail = { value: string };
 
 /**
- * 拼音 IME 自定义元素；通过 `getDictionary` property 自定义词典加载。
+ * 拼音 IME 自定义元素。
+ *
+ * @remarks
+ * 词典：`getDictionary`（若设置）→ 否则默认包内 `google_pinyin_dict`。自定义（dota2、远程、本地模块等）请用 `getDictionary`。
  */
 export class PinyinIMEEditor extends LitElement {
   static override styles = [unsafeCSS(PINYIN_IME_STYLE_TEXT)];
@@ -81,6 +84,8 @@ export class PinyinIMEEditor extends LitElement {
   private _unsub: (() => void) | null = null;
   private _customEngine: PinyinEngine | null = null;
   private _dictionaryState: DictionaryState = "idle";
+  /** 词典加载请求序号（递增）；仅接受最后一次请求结果。 */
+  private _dictionaryLoadSeq = 0;
   private _position: PopupPosition | null = null;
   private _onWinResize = (): void => {
     this._syncPosition();
@@ -157,32 +162,53 @@ export class PinyinIMEEditor extends LitElement {
   }
 
   /**
-   * 加载词典：getDictionary 非空则调用（远程），否则动态 import 本地词典。
+   * 加载默认包内 google 词典。
+   *
+   * @remarks
+   * 先尝试子路径 `import("pinyin-ime/dictionary/google_pinyin_dict")`，以便 Vite 等按 `package.json` exports / alias 解析源码；
+   * 失败时再使用 `import.meta.url` 邻接的 `./dictionary/google_pinyin_dict.js`（直连已发布的 `dist/index.js` 时）。
+   *
+   * @returns 词典对象
+   */
+  private async _importDefaultGoogleDict(): Promise<PinyinDict> {
+    try {
+      const m = await import("pinyin-ime/dictionary/google_pinyin_dict");
+      return m.dict;
+    } catch {
+      throw new Error("Failed to import default google dictionary");
+    }
+  }
+
+  /**
+   * 按 `getDictionary`（若设置）否则默认包内 google 加载词典。
    */
   private _loadDictionary(): void {
+    const requestSeq = ++this._dictionaryLoadSeq;
     this._dictionaryState = "loading";
     this._customEngine = null;
 
-    const loadFromRemote = (): Promise<PinyinDict> =>
-      Promise.resolve(this.getDictionary!());
+    const hasGetDictionary = typeof this.getDictionary === "function";
 
-    const loadFromLocal = (): Promise<PinyinDict> =>
-      import("./dict").then((m) => m.dict);
-
-    const load = this.getDictionary ? loadFromRemote() : loadFromLocal();
+    const load: Promise<PinyinDict> =
+      hasGetDictionary
+        ? Promise.resolve(this.getDictionary!())
+        : this._importDefaultGoogleDict();
 
     load
       .then((dict) => {
+        if (requestSeq !== this._dictionaryLoadSeq) return;
         const engine = createPinyinEngine(dict);
         this._customEngine = engine;
         registerDefaultEngine(engine);
         this._dictionaryState = "ready";
       })
       .catch(() => {
+        if (requestSeq !== this._dictionaryLoadSeq) return;
         this._customEngine = null;
         this._dictionaryState = "error";
       })
       .finally(() => {
+        if (requestSeq !== this._dictionaryLoadSeq) return;
         this._controller?.setOptions({ getEngine: () => this._resolvedEngine() });
         this.requestUpdate();
       });

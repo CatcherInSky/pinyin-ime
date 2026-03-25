@@ -1,6 +1,6 @@
 {
   "name": "pinyin-ime",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "拼音转汉字输入法能力：在无法使用系统输入法的场景使用，通过候选框选词上屏",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,10 +11,8 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./dict": {
-      "import": "./dist/dict.js",
-      "types": "./dist/dict.d.ts"
-    },
+    "./dictionary/dota2_pinyin_dict": "./dist/dictionary/dota2_pinyin_dict.js",
+    "./dictionary/google_pinyin_dict": "./dist/dictionary/google_pinyin_dict.js",
     "./pinyin-ime.css": "./dist/pinyin-ime.css"
   },
   "files": [
@@ -24,7 +22,8 @@
   ],
   "sideEffects": [
     "./dist/index.js",
-    "./dist/dict.js",
+    "./dist/dictionary/dota2_pinyin_dict.js",
+    "./dist/dictionary/google_pinyin_dict.js",
     "./dist/pinyin-ime.css"
   ],
   "scripts": {
@@ -35,9 +34,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
-    "site:dev": "pnpm --filter pinyin-ime-site dev --mode development",
-    "site:dev:hot": "pnpm --filter pinyin-ime-site dev --mode development",
-    "site:dev:npm": "pnpm --filter pinyin-ime-site dev --mode production",
+    "site:dev": "pnpm --filter pinyin-ime-site dev",
+    "site:dev:hot": "pnpm --filter pinyin-ime-site dev --config vite.local.config.ts",
+    "site:dev:npm": "pnpm --filter pinyin-ime-site dev --config vite.dist.config.ts",
     "site:build": "pnpm run build && pnpm --filter pinyin-ime-site build --mode production",
     "publish:npm": "pnpm publish --no-git-checks --registry https://registry.npmjs.org/"
   },

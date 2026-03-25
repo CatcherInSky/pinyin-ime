@@ -114,9 +114,9 @@ document.body.append(el);
 | `enabled`     | `boolean`              | `true`    | 是否启用 IME 逻辑    |
 
 
-### 2.2 仅 property（不可用 HTML attribute 设置）
+### 2.2 仅 JavaScript property（无 HTML attribute）
 
-通过 JavaScript 可设置以下 property（无法通过 HTML attribute 设置）：
+以下只能通过 property 赋值（无对应 attribute）：
 
 ```ts
 type PopupPlacement = "top" | "bottom" | "left" | "right";
@@ -124,7 +124,9 @@ type GetDictionaryFn = () => Promise<PinyinDict> | PinyinDict;
 ```
 
 - `**popupPosition**`：候选框相对输入框位置，默认 `"top"`。
-- `**getDictionary**`：组件初始化（`connectedCallback`）时调用；返回词典对象或 Promise；resolve 前候选框显示「加载中…」；未设置时动态 import 包内词典（`pinyin-ime/dict`），按需加载。
+- `**getDictionary**`：初始化时调用；返回词典或 Promise；resolve 前候选框显示「加载中…」。未设置时默认加载包内 google 词典。
+
+主包另导出 `**packagedDictionaryModuleUrl("google" | "dota2")**`：返回包内词典 ESM 的绝对 URL，供 `import(url)` 兜底；自定义词典请优先在 **`getDictionary`** 里使用 `import("pinyin-ime/dictionary/...")` 或 `fetch`。
 
 ```js
 const el = document.querySelector("pinyin-ime-editor");
@@ -138,7 +140,7 @@ el.getDictionary = () =>
 除 `value`、`editor-type`、`page-size`、`enabled`、`class` 外，其它 attribute 会透传到内部的 `<input>` 或 `<textarea>`，便于进一步定制（如 `placeholder`、`disabled`、`rows` 等）：
 
 ```html
-<pinyin-ime-editor placeholder="请输入" rows="6" editor-type="textarea" />popupPosition
+<pinyin-ime-editor placeholder="请输入" rows="6" editor-type="textarea" />
 ```
 
 ### 2.4 事件
@@ -192,16 +194,14 @@ pinyin-ime-editor::part(candidate-row):hover {
 
 ## 4. 字典
 
-### 4.1 两种加载方式
+### 4.1 加载方式
 
+| 方式 | 条件 | 行为 |
+| ---- | ---- | ---- |
+| **自定义** | 已设置 `getDictionary` | 宿主返回 `PinyinDict`（`fetch`、`import("pinyin-ime/dictionary/...")`、本地模块等均可） |
+| **默认包内** | 未设置 `getDictionary` | 加载包内 google 词典（`dist/dictionary/google_pinyin_dict.js`，不内嵌进 `index.js`） |
 
-| 方式       | 条件                  | 行为                                      | 第三方构建                             |
-| -------- | ------------------- | --------------------------------------- | --------------------------------- |
-| **本地加载** | `getDictionary` 未设置 | 动态 `import("pinyin-ime/dict")` 按需加载包内词典 | 会生成字典 chunk，仅在使用本地时加载             |
-| **远程加载** | `getDictionary` 已设置 | 调用用户方法获取词典                              | 不加载字典 chunk，运行时由 getDictionary 提供 |
-
-
-只需 `import "pinyin-ime"`，无需额外 import；本地/远程由是否设置 `getDictionary` 决定。
+使用包内 **dota2** 词典：`getDictionary: () => import("pinyin-ime/dictionary/dota2_pinyin_dict").then((m) => m.dict)`。
 
 ### 4.2 远程加载示例
 
@@ -215,11 +215,12 @@ el.getDictionary = () =>
 ### 4.3 子路径与 API
 
 
-| 子路径                         | 说明                                                    |
-| --------------------------- | ----------------------------------------------------- |
-| `pinyin-ime`                | 主入口，注册 `<pinyin-ime-editor>` 并导出 API                  |
-| `pinyin-ime/dict`           | 导出 `dict`，供 element 本地加载时 `import("pinyin-ime/dict")` |
-| `pinyin-ime/pinyin-ime.css` | 默认样式（Shadow DOM 内联为主，按需引入）                            |
+| 子路径 | 说明 |
+| ------ | ---- |
+| `pinyin-ime` | 主入口，注册 `<pinyin-ime-editor>` 并导出 API（含 `packagedDictionaryModuleUrl`） |
+| `pinyin-ime/dictionary/google_pinyin_dict` | 包内 google 词典 ESM（`export const dict`） |
+| `pinyin-ime/dictionary/dota2_pinyin_dict` | 包内 dota2+google 合并词典 ESM |
+| `pinyin-ime/pinyin-ime.css` | 默认样式（Shadow DOM 内联为主，按需引入） |
 
 
 可导入 `**createPinyinEngine`**、`**loadPinyinDictFromUrl**` 等 API 自行构建引擎。`getCandidates`、`computeMatchedLength` 使用已注册的默认引擎（需至少有一个 `<pinyin-ime-editor>` 已加载词典后才会生效）。

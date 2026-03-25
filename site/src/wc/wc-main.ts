@@ -20,7 +20,8 @@ type PinyinImeHostEl = HTMLElement & {
 };
 
 /** 远程词典 CDN 地址（示例固定版本）。 */
-const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const CDN_DICT_URL =
+  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
 
 /** Web Component 本地 input 示例代码。 */
 const WC_LOCAL_INPUT_CODE = `import "pinyin-ime";
@@ -41,7 +42,8 @@ document.body.append(el);`;
 const WC_CDN_CODE = `import "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
-const CDN_DICT_URL = "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
+const CDN_DICT_URL =
+  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
 const el = document.createElement("pinyin-ime-editor");
 el.getDictionary = async () => {
   const mod = await import(/* @vite-ignore */ CDN_DICT_URL);
@@ -206,12 +208,13 @@ function main() {
   sectionRemote.className = "space-y-2";
   const h2Remote = document.createElement("h2");
   h2Remote.className = "text-lg font-semibold";
-  h2Remote.textContent = "远程词典（getDictionary + CDN dict.js）";
+  h2Remote.textContent =
+    "远程词典（getDictionary + CDN google_pinyin_dict.js）";
   sectionRemote.appendChild(h2Remote);
   const remoteTip = document.createElement("p");
   remoteTip.className = "text-xs text-muted-foreground";
   remoteTip.textContent =
-    "示例从 jsDelivr 动态加载 https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js 并通过 getDictionary 注入。";
+    "示例从 jsDelivr 动态加载 https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js 并通过 getDictionary 注入。";
   sectionRemote.appendChild(remoteTip);
   const holderRemote = document.createElement("div");
   const editorRemote = document.createElement("pinyin-ime-editor") as PinyinImeHostEl;
