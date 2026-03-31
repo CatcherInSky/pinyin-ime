@@ -82,6 +82,7 @@ export class PinyinIMEEditor extends LitElement {
   > | null = null;
 
   private _unsub: (() => void) | null = null;
+  private _cleanupNativeListeners: (() => void) | null = null;
   private _customEngine: PinyinEngine | null = null;
   private _dictionaryState: DictionaryState = "idle";
   /** 词典加载请求序号（递增）；仅接受最后一次请求结果。 */
@@ -223,6 +224,8 @@ export class PinyinIMEEditor extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._cleanupNativeListeners?.();
+    this._cleanupNativeListeners = null;
     this._unsub?.();
     this._unsub = null;
     this._controller = null;
@@ -256,17 +259,97 @@ export class PinyinIMEEditor extends LitElement {
       this.requestUpdate();
     });
     this.requestUpdate();
+    this._cleanupNativeListeners = this._bindNativeListeners(el);
+  }
 
-    el.addEventListener(
-      "beforeinput",
-      (e) => this._controller?.handleBeforeInput(e as InputEvent),
-      true
-    );
-    el.addEventListener(
-      "keydown",
-      (e: Event) => this._controller?.handleKeyDown(e as KeyboardEvent),
-      true
-    );
+  /**
+   * 将内部输入节点的关键事件桥接到宿主，供框架在 `<pinyin-ime-editor>` 上监听。
+   *
+   * @param sourceEl - 当前激活的内部输入节点
+   * @returns 解绑函数
+   */
+  private _bindNativeListeners(
+    sourceEl: HTMLInputElement | HTMLTextAreaElement
+  ): () => void {
+    const onBeforeInput = (e: Event): void => {
+      this._controller?.handleBeforeInput(e as InputEvent);
+    };
+    const onKeyDown = (e: Event): void => {
+      this._controller?.handleKeyDown(e as KeyboardEvent);
+    };
+
+    const onFocusLike = (e: Event): void => {
+      this._forwardFocusEvent(e as FocusEvent);
+    };
+    const onSelect = (e: Event): void => {
+      this._forwardSimpleEvent(e, "select", false);
+    };
+    const onInvalid = (e: Event): void => {
+      this._forwardSimpleEvent(e, "invalid", true);
+    };
+
+    sourceEl.addEventListener("beforeinput", onBeforeInput, true);
+    sourceEl.addEventListener("keydown", onKeyDown, true);
+    sourceEl.addEventListener("focus", onFocusLike, true);
+    sourceEl.addEventListener("blur", onFocusLike, true);
+    sourceEl.addEventListener("focusin", onFocusLike, true);
+    sourceEl.addEventListener("focusout", onFocusLike, true);
+    sourceEl.addEventListener("select", onSelect, true);
+    sourceEl.addEventListener("invalid", onInvalid, true);
+
+    return () => {
+      sourceEl.removeEventListener("beforeinput", onBeforeInput, true);
+      sourceEl.removeEventListener("keydown", onKeyDown, true);
+      sourceEl.removeEventListener("focus", onFocusLike, true);
+      sourceEl.removeEventListener("blur", onFocusLike, true);
+      sourceEl.removeEventListener("focusin", onFocusLike, true);
+      sourceEl.removeEventListener("focusout", onFocusLike, true);
+      sourceEl.removeEventListener("select", onSelect, true);
+      sourceEl.removeEventListener("invalid", onInvalid, true);
+    };
+  }
+
+  /**
+   * 转发来自内部输入节点的焦点事件到宿主元素。
+   *
+   * @param e - 内部输入节点触发的焦点事件
+   */
+  private _forwardFocusEvent(e: FocusEvent): void {
+    if (e.target !== this.inputRef.value) return;
+    const forwarded = new FocusEvent(e.type, {
+      bubbles: true,
+      composed: true,
+      cancelable: e.cancelable,
+      relatedTarget: e.relatedTarget,
+    });
+    const accepted = this.dispatchEvent(forwarded);
+    if (!accepted && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+
+  /**
+   * 转发来自内部输入节点的通用事件到宿主元素。
+   *
+   * @param e - 内部输入节点触发的事件
+   * @param type - 事件名
+   * @param cancelable - 是否允许取消
+   */
+  private _forwardSimpleEvent(
+    e: Event,
+    type: "select" | "invalid",
+    cancelable: boolean
+  ): void {
+    if (e.target !== this.inputRef.value) return;
+    const forwarded = new Event(type, {
+      bubbles: true,
+      composed: true,
+      cancelable,
+    });
+    const accepted = this.dispatchEvent(forwarded);
+    if (!accepted && cancelable && e.cancelable) {
+      e.preventDefault();
+    }
   }
 
   private _onValueChange(v: string): void {
