@@ -1,6 +1,6 @@
 {
   "name": "pinyin-ime",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "拼音转汉字输入法能力：在无法使用系统输入法的场景使用，通过候选框选词上屏",
   "type": "module",
   "main": "./dist/index.js",

@@ -103,6 +103,32 @@ export class PinyinIMEEditor extends LitElement {
   }
 
   /**
+   * 将宿主的 `focus()` 代理到内部输入节点。
+   *
+   * @param options - 原生聚焦选项
+   */
+  override focus(options?: FocusOptions): void {
+    const target = this.inputRef.value;
+    if (target) {
+      target.focus(options);
+      return;
+    }
+    super.focus(options);
+  }
+
+  /**
+   * 将宿主的 `blur()` 代理到内部输入节点。
+   */
+  override blur(): void {
+    const target = this.inputRef.value;
+    if (target) {
+      target.blur();
+      return;
+    }
+    super.blur();
+  }
+
+  /**
    * @returns 当前用于匹配的引擎
    */
   private _resolvedEngine(): PinyinEngine | null {
