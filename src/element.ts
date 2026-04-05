@@ -682,6 +682,9 @@ export class PinyinIMEEditor extends LitElement {
       : "英文输入模式，按 Shift 切换中文";
   }
 
+  /**
+   * 渲染内部输入框、中/英文模式角标（仅在 {@link PinyinIMEEditor.enabled} 为真时）及拼音候选弹层。
+   */
   override render() {
     const snap = this._controller?.getSnapshot();
     const show =
@@ -690,13 +693,18 @@ export class PinyinIMEEditor extends LitElement {
       snap.pinyinInput.length > 0;
 
     const chineseMode = snap?.chineseMode !== false;
-    const modeHint = this._modeDescription(chineseMode);
+    const modeHint = this.enabled
+      ? this._modeDescription(chineseMode)
+      : undefined;
+    const fieldModeBadgeClass = this.enabled
+      ? " pinyin-ime-field--with-mode-badge"
+      : "";
 
     const field =
       this.editorType === "textarea"
         ? html`<textarea
             ${ref(this.inputRef)}
-            class="pinyin-ime-textarea pinyin-ime-field--with-mode-badge"
+            class=${`pinyin-ime-textarea${fieldModeBadgeClass}`}
             .value=${this.value}
             aria-label=${modeHint}
             title=${modeHint}
@@ -704,7 +712,7 @@ export class PinyinIMEEditor extends LitElement {
           ></textarea>`
         : html`<input
             ${ref(this.inputRef)}
-            class="pinyin-ime-input pinyin-ime-field--with-mode-badge"
+            class=${`pinyin-ime-input${fieldModeBadgeClass}`}
             .value=${this.value}
             aria-label=${modeHint}
             title=${modeHint}
@@ -714,12 +722,14 @@ export class PinyinIMEEditor extends LitElement {
     return html`
       <div class="pinyin-ime-field-wrap">
         ${field}
-        <span
-          part="mode-badge"
-          class="pinyin-ime-mode-badge"
-          aria-hidden="true"
-          >${chineseMode ? "中" : "A"}</span
-        >
+        ${this.enabled
+          ? html`<span
+              part="mode-badge"
+              class="pinyin-ime-mode-badge"
+              aria-hidden="true"
+              >${chineseMode ? "中" : "A"}</span
+            >`
+          : nothing}
         ${show ? this._renderPopup() : nothing}
       </div>
     `;
