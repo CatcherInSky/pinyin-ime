@@ -16,11 +16,24 @@
   --pinyin-ime-text-color: #18181b;
   --pinyin-ime-muted-color: #71717a;
   --pinyin-ime-selection-bg: #bfdbfe;
+  --pinyin-ime-mode-badge-color: #71717a;
 }
 
 .pinyin-ime-field-wrap {
   position: relative;
   width: 100%;
+}
+
+.pinyin-ime-mode-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  line-height: 1;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--pinyin-ime-mode-badge-color);
+  pointer-events: none;
+  user-select: none;
 }
 
 .pinyin-ime-input,
@@ -36,6 +49,10 @@
   padding: 0.5rem 0.75rem;
   outline: none;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.pinyin-ime-field--with-mode-badge {
+  padding-right: 2rem;
 }
 
 .pinyin-ime-textarea {

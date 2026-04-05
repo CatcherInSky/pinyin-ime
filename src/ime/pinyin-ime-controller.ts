@@ -78,6 +78,8 @@ export interface PinyinIMEControllerSnapshot {
   highlightedCandidateIndex: number | null;
   /** 拼音非空时可为 true；是否与弹层同显由宿主结合定位再定 */
   hasActiveComposition: boolean;
+  /** `true` 为中文（拼音缓冲）模式；`false` 为英文直输 */
+  chineseMode: boolean;
 }
 
 /**
@@ -143,6 +145,16 @@ function isDigitSelectKey(key: string, pageSize: number): boolean {
 }
 
 /**
+ * 是否为物理 Shift 键（左右）。
+ *
+ * @param code - `KeyboardEvent.code`
+ * @returns 是否为 ShiftLeft / ShiftRight
+ */
+function isShiftPhysicalCode(code: string): boolean {
+  return code === "ShiftLeft" || code === "ShiftRight";
+}
+
+/**
  * 拼音 IME 控制器：在原生事件上调用 {@link PinyinIMEController.handleBeforeInput} /
  * {@link PinyinIMEController.handleKeyDown}，通过 {@link PinyinIMEController.subscribe} 订阅 UI 更新。
  *
@@ -170,6 +182,15 @@ export class PinyinIMEController<
    * 删除回退到锚点以内或发生选词/提交后会解除该状态。
    */
   private missPrefixLock: string | null = null;
+
+  /** `true`：字母进入拼音缓冲；`false`：交给浏览器默认插入（保留大小写） */
+  private chineseMode = true;
+  /** 当前仍按下的物理 Shift 键数量（左右各算一个） */
+  private shiftPhysicalDown = 0;
+  /**
+   * 自本轮首个 Shift 按下以来是否出现过非 Shift 的 keydown（用于区分单独点按 Shift 与 Shift+组合键）。
+   */
+  private shiftGestureOtherKeySeen = false;
 
   /**
    * `useSyncExternalStore` 要求：在状态未变时 {@link PinyinIMEController.getSnapshot} 返回同一引用。
@@ -234,6 +255,7 @@ export class PinyinIMEController<
         pageSize: this.pageSize,
         highlightedCandidateIndex: this.highlightedCandidateIndex,
         hasActiveComposition: this.pinyinInput.length > 0,
+        chineseMode: this.chineseMode,
       };
     }
     return this.cachedSnapshot;
@@ -509,6 +531,29 @@ export class PinyinIMEController<
   }
 
   /**
+   * 将当前拼音缓冲按原文上屏并清空缓冲（与 Enter 行为一致）。
+   */
+  private commitPinyinBufferAsRaw(): void {
+    this.insertText(this.pinyinInput);
+    this.pinyinInput = "";
+    this.collapsePinyinSelection(0);
+    this.clearMissPrefixLock();
+    this.recomputeCandidates();
+    this.emit();
+  }
+
+  /**
+   * 失焦时重置 Shift 手势跟踪，避免计数与真实键盘状态脱节。
+   *
+   * @remarks
+   * 由宿主在内部 `input`/`textarea` 的 `blur`/`focusout` 上调用。
+   */
+  resetShiftGestureState(): void {
+    this.shiftPhysicalDown = 0;
+    this.shiftGestureOtherKeySeen = false;
+  }
+
+  /**
    * 处理 `beforeinput`（需在 capture 或目标阶段与 `preventDefault` 配合）。
    *
    * @param e - 原生 `InputEvent`
@@ -544,8 +589,39 @@ export class PinyinIMEController<
         return;
       }
     }
-    if (/^[a-zA-Z']$/.test(d)) {
+    if (this.chineseMode && /^[a-zA-Z']$/.test(d)) {
       e.preventDefault();
+    }
+  }
+
+  /**
+   * 处理 `keyup`（建议在 capture 阶段调用）；用于单独点按 Shift 切换中/英或提交拼音。
+   *
+   * @param e - 原生 `KeyboardEvent`
+   * @remarks
+   * 仅在松开「最后一个」仍按下的物理 Shift 键且本轮未组合其它键时生效；
+   * 与 {@link PinyinIMEController.handleKeyDown} 中的 Shift 计数及 `shiftGestureOtherKeySeen` 配合。
+   */
+  handleKeyUp(e: KeyboardEvent): void {
+    if (this.options.enabled === false) return;
+    if (!isShiftPhysicalCode(e.code)) return;
+
+    if (this.shiftPhysicalDown === 0) return;
+    this.shiftPhysicalDown -= 1;
+    if (this.shiftPhysicalDown > 0) return;
+
+    const solo = !this.shiftGestureOtherKeySeen;
+    this.shiftGestureOtherKeySeen = false;
+
+    if (!solo) return;
+
+    e.preventDefault();
+
+    if (this.pinyinInput.length > 0) {
+      this.commitPinyinBufferAsRaw();
+    } else {
+      this.chineseMode = !this.chineseMode;
+      this.emit();
     }
   }
 
@@ -558,6 +634,18 @@ export class PinyinIMEController<
     if (this.options.enabled === false) {
       this.options.onKeyDown?.(e);
       return;
+    }
+
+    if (isShiftPhysicalCode(e.code)) {
+      if (this.shiftPhysicalDown === 0) {
+        this.shiftGestureOtherKeySeen = false;
+      }
+      this.shiftPhysicalDown++;
+      this.options.onKeyDown?.(e);
+      return;
+    }
+    if (this.shiftPhysicalDown > 0) {
+      this.shiftGestureOtherKeySeen = true;
     }
 
     if (this.pinyinInput.length > 0 && isPagingOrControlSymbolKey(e)) {
@@ -673,12 +761,7 @@ export class PinyinIMEController<
 
       if (e.key === "Enter") {
         e.preventDefault();
-        this.insertText(this.pinyinInput);
-        this.pinyinInput = "";
-        this.collapsePinyinSelection(0);
-        this.clearMissPrefixLock();
-        this.recomputeCandidates();
-        this.emit();
+        this.commitPinyinBufferAsRaw();
         return;
       }
 
@@ -734,7 +817,13 @@ export class PinyinIMEController<
       }
     }
 
-    if (/^[a-z']$/i.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    if (
+      this.chineseMode &&
+      /^[a-z']$/i.test(e.key) &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey
+    ) {
       e.preventDefault();
       e.stopPropagation();
       const ch = e.key.toLowerCase();

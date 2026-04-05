@@ -303,6 +303,9 @@ export class PinyinIMEEditor extends LitElement {
     const onKeyDown = (e: Event): void => {
       this._controller?.handleKeyDown(e as KeyboardEvent);
     };
+    const onKeyUp = (e: Event): void => {
+      this._controller?.handleKeyUp(e as KeyboardEvent);
+    };
 
     const onFocusLike = (e: Event): void => {
       this._forwardFocusEvent(e as FocusEvent);
@@ -316,6 +319,7 @@ export class PinyinIMEEditor extends LitElement {
 
     sourceEl.addEventListener("beforeinput", onBeforeInput, true);
     sourceEl.addEventListener("keydown", onKeyDown, true);
+    sourceEl.addEventListener("keyup", onKeyUp, true);
     sourceEl.addEventListener("focus", onFocusLike, true);
     sourceEl.addEventListener("blur", onFocusLike, true);
     sourceEl.addEventListener("focusin", onFocusLike, true);
@@ -326,6 +330,7 @@ export class PinyinIMEEditor extends LitElement {
     return () => {
       sourceEl.removeEventListener("beforeinput", onBeforeInput, true);
       sourceEl.removeEventListener("keydown", onKeyDown, true);
+      sourceEl.removeEventListener("keyup", onKeyUp, true);
       sourceEl.removeEventListener("focus", onFocusLike, true);
       sourceEl.removeEventListener("blur", onFocusLike, true);
       sourceEl.removeEventListener("focusin", onFocusLike, true);
@@ -342,6 +347,9 @@ export class PinyinIMEEditor extends LitElement {
    */
   private _forwardFocusEvent(e: FocusEvent): void {
     if (e.target !== this.inputRef.value) return;
+    if (e.type === "blur" || e.type === "focusout") {
+      this._controller?.resetShiftGestureState();
+    }
     const forwarded = new FocusEvent(e.type, {
       bubbles: true,
       composed: true,
@@ -434,6 +442,18 @@ export class PinyinIMEEditor extends LitElement {
     this._controller?.addPage(delta);
   }
 
+  /**
+   * 供读屏与 `title` 使用的中/英文模式说明。
+   *
+   * @param chineseMode - 是否为中文（拼音）模式
+   * @returns 简短说明句
+   */
+  private _modeDescription(chineseMode: boolean): string {
+    return chineseMode
+      ? "中文输入模式，按 Shift 切换英文"
+      : "英文输入模式，按 Shift 切换中文";
+  }
+
   override render() {
     const snap = this._controller?.getSnapshot();
     const show =
@@ -441,24 +461,37 @@ export class PinyinIMEEditor extends LitElement {
       this._position != null &&
       snap.pinyinInput.length > 0;
 
+    const chineseMode = snap?.chineseMode !== false;
+    const modeHint = this._modeDescription(chineseMode);
+
     const field =
       this.editorType === "textarea"
         ? html`<textarea
             ${ref(this.inputRef)}
-            class="pinyin-ime-textarea"
+            class="pinyin-ime-textarea pinyin-ime-field--with-mode-badge"
             .value=${this.value}
+            aria-label=${modeHint}
+            title=${modeHint}
             @input=${this._onNativeInput}
           ></textarea>`
         : html`<input
             ${ref(this.inputRef)}
-            class="pinyin-ime-input"
+            class="pinyin-ime-input pinyin-ime-field--with-mode-badge"
             .value=${this.value}
+            aria-label=${modeHint}
+            title=${modeHint}
             @input=${this._onNativeInput}
           />`;
 
     return html`
       <div class="pinyin-ime-field-wrap">
         ${field}
+        <span
+          part="mode-badge"
+          class="pinyin-ime-mode-badge"
+          aria-hidden="true"
+          >${chineseMode ? "中" : "A"}</span
+        >
         ${show ? this._renderPopup() : nothing}
       </div>
     `;

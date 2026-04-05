@@ -114,6 +114,8 @@ function appendShortcuts(parent: HTMLElement) {
     "左右方向键：拼音串内移动光标",
     "Ctrl+A：全选拼音缓冲，可删除或直接替换",
     "Enter：上屏拼音；Escape：清空缓冲",
+    "Shift 单击：无拼音时切换中/英（见框内角标）",
+    "Shift 单击：有拼音时上屏拼音（与 Enter 相同）；Shift+左右键仍用于扩选",
   ];
   for (const t of lines) {
     const li = document.createElement("li");
