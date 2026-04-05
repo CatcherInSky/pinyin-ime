@@ -1,0 +1,362 @@
+{
+  "inputs": {
+    "src/lib/classnames.ts": {
+      "bytes": 445,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/dictionary/registry.ts": {
+      "bytes": 591,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/engine/pinyin-engine.ts": {
+      "bytes": 13965,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/dictionary/load-dictionary.ts": {
+      "bytes": 2611,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/engine/pinyin.ts": {
+      "bytes": 1241,
+      "imports": [
+        {
+          "path": "src/dictionary/registry.ts",
+          "kind": "import-statement",
+          "original": "../dictionary/registry"
+        },
+        {
+          "path": "src/engine/pinyin-engine.ts",
+          "kind": "import-statement",
+          "original": "./pinyin-engine"
+        },
+        {
+          "path": "src/dictionary/load-dictionary.ts",
+          "kind": "import-statement",
+          "original": "../dictionary/load-dictionary"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/ime/pinyin-ime-controller.ts": {
+      "bytes": 24484,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/css-tag.js": {
+      "bytes": 1585,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/reactive-element.js": {
+      "bytes": 6306,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/css-tag.js",
+          "kind": "import-statement",
+          "original": "./css-tag.js"
+        },
+        {
+          "path": "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/css-tag.js",
+          "kind": "import-statement",
+          "original": "./css-tag.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js": {
+      "bytes": 7309,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js": {
+      "bytes": 1124,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/reactive-element.js",
+          "kind": "import-statement",
+          "original": "@lit/reactive-element"
+        },
+        {
+          "path": "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/reactive-element.js",
+          "kind": "import-statement",
+          "original": "@lit/reactive-element"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js",
+          "kind": "import-statement",
+          "original": "lit-html"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js",
+          "kind": "import-statement",
+          "original": "lit-html"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/is-server.js": {
+      "bytes": 162,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit@3.3.2/node_modules/lit/index.js": {
+      "bytes": 157,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/reactive-element.js",
+          "kind": "import-statement",
+          "original": "@lit/reactive-element"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js",
+          "kind": "import-statement",
+          "original": "lit-html"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js",
+          "kind": "import-statement",
+          "original": "lit-element/lit-element.js"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/is-server.js",
+          "kind": "import-statement",
+          "original": "lit-html/is-server.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive-helpers.js": {
+      "bytes": 1272,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js",
+          "kind": "import-statement",
+          "original": "./lit-html.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive.js": {
+      "bytes": 481,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/async-directive.js": {
+      "bytes": 1389,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive-helpers.js",
+          "kind": "import-statement",
+          "original": "./directive-helpers.js"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive.js",
+          "kind": "import-statement",
+          "original": "./directive.js"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive.js",
+          "kind": "import-statement",
+          "original": "./directive.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directives/ref.js": {
+      "bytes": 994,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js",
+          "kind": "import-statement",
+          "original": "../lit-html.js"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/async-directive.js",
+          "kind": "import-statement",
+          "original": "../async-directive.js"
+        },
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive.js",
+          "kind": "import-statement",
+          "original": "../directive.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/.pnpm/lit@3.3.2/node_modules/lit/directives/ref.js": {
+      "bytes": 73,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directives/ref.js",
+          "kind": "import-statement",
+          "original": "lit-html/directives/ref.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/ime/pinyin-ime-style-text.ts": {
+      "bytes": 5117,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/element.ts": {
+      "bytes": 20732,
+      "imports": [
+        {
+          "path": "node_modules/.pnpm/lit@3.3.2/node_modules/lit/index.js",
+          "kind": "import-statement",
+          "original": "lit"
+        },
+        {
+          "path": "node_modules/.pnpm/lit@3.3.2/node_modules/lit/directives/ref.js",
+          "kind": "import-statement",
+          "original": "lit/directives/ref.js"
+        },
+        {
+          "path": "src/engine/pinyin.ts",
+          "kind": "import-statement",
+          "original": "./engine/pinyin"
+        },
+        {
+          "path": "src/dictionary/registry.ts",
+          "kind": "import-statement",
+          "original": "./dictionary/registry"
+        },
+        {
+          "path": "src/ime/pinyin-ime-controller.ts",
+          "kind": "import-statement",
+          "original": "./ime/pinyin-ime-controller"
+        },
+        {
+          "path": "src/ime/pinyin-ime-style-text.ts",
+          "kind": "import-statement",
+          "original": "./ime/pinyin-ime-style-text"
+        },
+        {
+          "path": "pinyin-ime/dictionary/google_pinyin_dict",
+          "kind": "dynamic-import",
+          "external": true
+        }
+      ],
+      "format": "esm"
+    },
+    "src/index.ts": {
+      "bytes": 787,
+      "imports": [
+        {
+          "path": "src/lib/classnames.ts",
+          "kind": "import-statement",
+          "original": "./lib/classnames"
+        },
+        {
+          "path": "src/engine/pinyin.ts",
+          "kind": "import-statement",
+          "original": "./engine/pinyin"
+        },
+        {
+          "path": "src/ime/pinyin-ime-controller.ts",
+          "kind": "import-statement",
+          "original": "./ime/pinyin-ime-controller"
+        },
+        {
+          "path": "src/element.ts",
+          "kind": "import-statement",
+          "original": "./element"
+        }
+      ],
+      "format": "esm"
+    }
+  },
+  "outputs": {
+    "../../../tmp": {
+      "imports": [
+        {
+          "path": "pinyin-ime/dictionary/google_pinyin_dict",
+          "kind": "dynamic-import",
+          "external": true
+        }
+      ],
+      "exports": [
+        "DictionaryLoadError",
+        "IME_PAGE_SIZE",
+        "PinyinIMEController",
+        "PinyinIMEEditor",
+        "assertPinyinDictShape",
+        "clampIMPageSize",
+        "computeMatchedLength",
+        "createPinyinEngine",
+        "getCandidates",
+        "joinClassNames",
+        "loadPinyinDictFromUrl"
+      ],
+      "entryPoint": "src/index.ts",
+      "inputs": {
+        "src/lib/classnames.ts": {
+          "bytesInOutput": 80
+        },
+        "src/index.ts": {
+          "bytesInOutput": 0
+        },
+        "src/dictionary/registry.ts": {
+          "bytesInOutput": 154
+        },
+        "src/engine/pinyin-engine.ts": {
+          "bytesInOutput": 9061
+        },
+        "src/engine/pinyin.ts": {
+          "bytesInOutput": 338
+        },
+        "src/dictionary/load-dictionary.ts": {
+          "bytesInOutput": 1583
+        },
+        "src/ime/pinyin-ime-controller.ts": {
+          "bytesInOutput": 19604
+        },
+        "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/css-tag.js": {
+          "bytesInOutput": 1379
+        },
+        "node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/reactive-element.js": {
+          "bytesInOutput": 8311
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/lit-html.js": {
+          "bytesInOutput": 10371
+        },
+        "node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js": {
+          "bytesInOutput": 917
+        },
+        "node_modules/.pnpm/lit@3.3.2/node_modules/lit/index.js": {
+          "bytesInOutput": 0
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/is-server.js": {
+          "bytesInOutput": 0
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive-helpers.js": {
+          "bytesInOutput": 59
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directive.js": {
+          "bytesInOutput": 435
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/async-directive.js": {
+          "bytesInOutput": 1568
+        },
+        "node_modules/.pnpm/lit-html@3.3.2/node_modules/lit-html/directives/ref.js": {
+          "bytesInOutput": 985
+        },
+        "node_modules/.pnpm/lit@3.3.2/node_modules/lit/directives/ref.js": {
+          "bytesInOutput": 0
+        },
+        "src/ime/pinyin-ime-style-text.ts": {
+          "bytesInOutput": 5079
+        },
+        "src/element.ts": {
+          "bytesInOutput": 16191
+        }
+      },
+      "bytes": 77970
+    }
+  }
+}

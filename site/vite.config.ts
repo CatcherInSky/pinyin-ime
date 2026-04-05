@@ -6,7 +6,12 @@ import vue from "@vitejs/plugin-vue";
  * Vite config for GitHub Pages at `/pinyinime/` (multi-page: `/react/`, `/vue/`, `/web_component/`).
  * @see https://vitejs.dev/config/
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(
+      mode === "production" ? "production" : "development"
+    ),
+  },
   plugins: [
     react(),
     vue({
@@ -29,4 +34,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

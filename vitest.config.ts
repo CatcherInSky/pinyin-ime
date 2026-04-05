@@ -6,6 +6,9 @@ import { defineConfig } from "vitest/config";
  * @returns Vitest 用户配置
  */
 export default defineConfig({
+  define: {
+    "process.env.NODE_ENV": JSON.stringify("test"),
+  },
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.ts"],

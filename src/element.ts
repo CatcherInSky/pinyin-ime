@@ -1,6 +1,6 @@
 /**
  * @file element.ts
- * @description 注册 `<pinyin-ime-editor>` Web Component（Lit）；侧载 `pinyin-ime/pinyin-ime.css` 或依赖 Shadow 内联样式。
+ * @description 注册 `<pinyin-ime-editor>` Web Component（Lit）；侧载 `pinyin-ime/pinyin-ime.css` 或依赖 Shadow 内联样式。词典首载统一推迟（`queueMicrotask` + idle 与内部 `focusin` 竞速；`getDictionary` 变更时立即加载）。
  */
 import {
   LitElement,
@@ -17,10 +17,47 @@ import type { PinyinEngine } from "./engine/pinyin-engine";
 import type { CandidateItem } from "./engine/pinyin-engine";
 import { PinyinIMEController } from "./ime/pinyin-ime-controller";
 import type { PopupPlacement, PopupPosition } from "./lib/types";
+import {
+  parseEditorTypeFromAttribute,
+  parseEnabledFromAttribute,
+  parsePageSizeFromAttribute,
+  parsePopupPlacementFromAttribute,
+  popupPlacementToAttribute,
+} from "./lib/pinyin-ime-editor-attr-parsers";
+
+/** `tsup` / Vite 在构建时内联 `NODE_ENV`；本声明仅供类型检查。 */
+declare const process: { env: { NODE_ENV?: string } };
 import { PINYIN_IME_STYLE_TEXT } from "./ime/pinyin-ime-style-text";
 
 /** 词典加载状态 */
 type DictionaryState = "idle" | "loading" | "ready" | "error";
+
+/** 默认包内 google 词典的共享 Promise（多实例共用同一次 dynamic import） */
+let defaultGoogleDictPromise: Promise<PinyinDict> | null = null;
+
+/**
+ * @returns 包内 google 词典；全页共享同一 Promise。
+ */
+function getSharedDefaultGoogleDict(): Promise<PinyinDict> {
+  return (defaultGoogleDictPromise ??= (async () => {
+    try {
+      const m = await import("pinyin-ime/dictionary/google_pinyin_dict");
+      return m.dict;
+    } catch {
+      throw new Error("Failed to import default google dictionary");
+    }
+  })());
+}
+
+/**
+ * 开发模式下输出词典加载轨迹（`idle` / `focusin` / `property:getDictionary` 等）；生产构建中由打包器内联为静默。
+ *
+ * @param args - 传给 `console.info` 的参数
+ */
+function dictionaryLoadDevLog(...args: unknown[]): void {
+  if (process.env.NODE_ENV === "production") return;
+  console.info("[pinyin-ime-editor dictionary]", ...args);
+}
 
 /** 自有属性名（不透传到内部 input/textarea） */
 const RESERVED_ATTRIBUTES = new Set([
@@ -29,6 +66,8 @@ const RESERVED_ATTRIBUTES = new Set([
   "page-size",
   "enabled",
   "class",
+  "dictionary-load",
+  "popup-position",
 ]);
 
 /**
@@ -48,16 +87,63 @@ export type PinyinIMEChangeDetail = { value: string };
  *
  * @remarks
  * 词典：`getDictionary`（若设置）→ 否则默认包内 `google_pinyin_dict`。自定义（dota2、远程、本地模块等）请用 `getDictionary`。
+ * **首次加载**统一推迟：`connectedCallback` 内 `queueMicrotask` 再排队 `requestIdleCallback`（`timeout: 2000`，不支持时用 `setTimeout(0)`），与内部输入框 **`focusin`（捕获）** 竞速；先发生者触发加载。`getDictionary` 在 Lit `willUpdate` 中变更时会取消上述等待并立即 `_loadDictionary`，便于与 React `useLayoutEffect` / Vue `onBeforeMount` 等同宏任务内赋值对齐。
+ * 宿主上的 `dictionary-load` 为**保留名**（不透传到内部 input），组件**不再解析**该属性。
  */
 export class PinyinIMEEditor extends LitElement {
   static override styles = [unsafeCSS(PINYIN_IME_STYLE_TEXT)];
 
   static override properties = {
-    value: { type: String },
-    editorType: { type: String, attribute: "editor-type" },
-    pageSize: { type: Number, attribute: "page-size" },
-    enabled: { type: Boolean },
-    popupPosition: { attribute: false },
+    value: {
+      type: String,
+      converter: {
+        fromAttribute(v: string | null): string {
+          return v ?? "";
+        },
+      },
+    },
+    editorType: {
+      type: String,
+      attribute: "editor-type",
+      converter: {
+        fromAttribute(value: string | null): "input" | "textarea" {
+          return parseEditorTypeFromAttribute(value);
+        },
+      },
+    },
+    pageSize: {
+      type: Number,
+      attribute: "page-size",
+      converter: {
+        fromAttribute(value: string | null): number {
+          return parsePageSizeFromAttribute(value);
+        },
+      },
+    },
+    enabled: {
+      type: Boolean,
+      converter: {
+        fromAttribute(value: string | null): boolean {
+          return parseEnabledFromAttribute(value);
+        },
+        toAttribute(value: boolean): string | null {
+          return value ? null : "false";
+        },
+      },
+      reflect: true,
+    },
+    popupPosition: {
+      type: String,
+      attribute: "popup-position",
+      converter: {
+        fromAttribute(value: string | null): PopupPlacement {
+          return parsePopupPlacementFromAttribute(value);
+        },
+        toAttribute(value: PopupPlacement): string {
+          return popupPlacementToAttribute(value);
+        },
+      },
+    },
     getDictionary: { attribute: false },
   };
 
@@ -88,6 +174,12 @@ export class PinyinIMEEditor extends LitElement {
   /** 词典加载请求序号（递增）；仅接受最后一次请求结果。 */
   private _dictionaryLoadSeq = 0;
   private _position: PopupPosition | null = null;
+  /** `requestIdleCallback` 句柄，或 `setTimeout` 兜底 */
+  private _idleCallbackHandle: number | null = null;
+  /** 当前 idle 句柄是否为 RIC（用于正确取消） */
+  private _idleCallbackIsRic = false;
+  /** 移除推迟首载模式下内部 input 的 `focusin` 监听 */
+  private _deferredFocusCleanup: (() => void) | null = null;
   private _onWinResize = (): void => {
     this._syncPosition();
     this.requestUpdate();
@@ -189,32 +281,145 @@ export class PinyinIMEEditor extends LitElement {
   }
 
   /**
-   * 加载默认包内 google 词典。
-   *
-   * @remarks
-   * 先尝试子路径 `import("pinyin-ime/dictionary/google_pinyin_dict")`，以便 Vite 等按 `package.json` exports / alias 解析源码；
-   * 失败时再使用 `import.meta.url` 邻接的 `./dictionary/google_pinyin_dict.js`（直连已发布的 `dist/index.js` 时）。
+   * 加载默认包内 google 词典（模块级 Promise 单例）。
    *
    * @returns 词典对象
    */
-  private async _importDefaultGoogleDict(): Promise<PinyinDict> {
-    try {
-      const m = await import("pinyin-ime/dictionary/google_pinyin_dict");
-      return m.dict;
-    } catch {
-      throw new Error("Failed to import default google dictionary");
+  private _importDefaultGoogleDict(): Promise<PinyinDict> {
+    return getSharedDefaultGoogleDict();
+  }
+
+  /**
+   * 取消推迟首载竞态：`requestIdleCallback` / `setTimeout` 与内部 `focusin`。
+   */
+  private _cancelDeferredDictionaryWaiters(): void {
+    if (this._idleCallbackHandle !== null) {
+      if (this._idleCallbackIsRic && typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(this._idleCallbackHandle);
+      } else {
+        clearTimeout(this._idleCallbackHandle);
+      }
+      this._idleCallbackHandle = null;
+    }
+    this._deferredFocusCleanup?.();
+    this._deferredFocusCleanup = null;
+  }
+
+  /**
+   * 在当前可排队空闲回调时注册 RIC / `setTimeout(0)`；已存在句柄或处于 `loading`/`ready` 时忽略。
+   */
+  private _scheduleDeferredIdleCallback(): void {
+    if (
+      this._dictionaryState === "loading" ||
+      this._dictionaryState === "ready"
+    ) {
+      dictionaryLoadDevLog("scheduleDeferredIdle skipped", {
+        state: this._dictionaryState,
+      });
+      return;
+    }
+    if (this._idleCallbackHandle !== null) {
+      dictionaryLoadDevLog("scheduleDeferredIdle skipped", {
+        reason: "idle-handle-already-set",
+      });
+      return;
+    }
+    const ric = globalThis.requestIdleCallback;
+    if (typeof ric === "function") {
+      this._idleCallbackIsRic = true;
+      this._idleCallbackHandle = ric.call(
+        globalThis,
+        () => {
+          this._idleCallbackHandle = null;
+          this._tryKickoffDeferredDictionaryLoad("idle");
+        },
+        { timeout: 2000 }
+      );
+      dictionaryLoadDevLog("scheduled requestIdleCallback (unified-defer)", {
+        timeoutMs: 2000,
+      });
+    } else {
+      this._idleCallbackIsRic = false;
+      this._idleCallbackHandle = window.setTimeout(() => {
+        this._idleCallbackHandle = null;
+        this._tryKickoffDeferredDictionaryLoad("idle");
+      }, 0);
+      dictionaryLoadDevLog("scheduled setTimeout(0) fallback (unified-defer)");
     }
   }
 
   /**
-   * 按 `getDictionary`（若设置）否则默认包内 google 加载词典。
+   * 推迟首载路径下由 idle 或 `focusin` 触发：取消等待器并 `_loadDictionary`。
+   * `loading` / `ready` 时忽略，避免与进行中的请求重叠；`error` 时允许再次尝试（如补设 `getDictionary` 后聚焦）。
+   *
+   * @param source - `idle` 为 RIC / `setTimeout`；`focusin` 为内部输入框捕获阶段聚焦
    */
-  private _loadDictionary(): void {
+  private _tryKickoffDeferredDictionaryLoad(
+    source: "idle" | "focusin"
+  ): void {
+    if (!this.isConnected) {
+      dictionaryLoadDevLog("deferred kickoff skipped", {
+        source,
+        reason: "disconnected",
+      });
+      return;
+    }
+    if (this._dictionaryState === "loading") {
+      dictionaryLoadDevLog("deferred kickoff skipped", {
+        source,
+        reason: "already-loading",
+      });
+      return;
+    }
+    if (this._dictionaryState === "ready") {
+      return;
+    }
+    dictionaryLoadDevLog("deferred kickoff → _loadDictionary", {
+      source,
+      stateBefore: this._dictionaryState,
+    });
+    this._cancelDeferredDictionaryWaiters();
+    this._loadDictionary(`deferred:${source}`);
+  }
+
+  /**
+   * 在内部输入节点上监听 `focusin`（capture），参与推迟首载竞速。
+   *
+   * @param el - 内部 `input` / `textarea`
+   */
+  private _attachDeferredFocusKickoff(
+    el: HTMLInputElement | HTMLTextAreaElement
+  ): void {
+    if (this._dictionaryState === "ready") return;
+    this._deferredFocusCleanup?.();
+    const handler = (): void => {
+      this._tryKickoffDeferredDictionaryLoad("focusin");
+    };
+    el.addEventListener("focusin", handler, true);
+    this._deferredFocusCleanup = (): void => {
+      el.removeEventListener("focusin", handler, true);
+    };
+  }
+
+  /**
+   * 按 `getDictionary`（若设置）否则默认包内 google 加载词典。
+   *
+   * @param trigger - 便于调试日志区分调用路径
+   */
+  private _loadDictionary(trigger: string): void {
     const requestSeq = ++this._dictionaryLoadSeq;
     this._dictionaryState = "loading";
     this._customEngine = null;
 
     const hasGetDictionary = typeof this.getDictionary === "function";
+
+    dictionaryLoadDevLog("_loadDictionary start", {
+      trigger,
+      requestSeq,
+      firstLoadPolicy: "unified-defer",
+      hasGetDictionary,
+      dictSource: hasGetDictionary ? "getDictionary" : "default-google",
+    });
 
     const load: Promise<PinyinDict> =
       hasGetDictionary
@@ -228,11 +433,17 @@ export class PinyinIMEEditor extends LitElement {
         this._customEngine = engine;
         registerDefaultEngine(engine);
         this._dictionaryState = "ready";
+        dictionaryLoadDevLog("_loadDictionary ok", {
+          trigger,
+          requestSeq,
+          dictKeyCount: Object.keys(dict).length,
+        });
       })
       .catch(() => {
         if (requestSeq !== this._dictionaryLoadSeq) return;
         this._customEngine = null;
         this._dictionaryState = "error";
+        dictionaryLoadDevLog("_loadDictionary error", { trigger, requestSeq });
       })
       .finally(() => {
         if (requestSeq !== this._dictionaryLoadSeq) return;
@@ -245,11 +456,22 @@ export class PinyinIMEEditor extends LitElement {
     super.connectedCallback();
     window.addEventListener("resize", this._onWinResize);
     window.addEventListener("scroll", this._onWinResize, true);
-    this._loadDictionary();
+    dictionaryLoadDevLog("connectedCallback", {
+      firstLoadPolicy: "unified-defer",
+      phase: "queueMicrotask-then-schedule-idle",
+    });
+    queueMicrotask(() => {
+      if (!this.isConnected) return;
+      dictionaryLoadDevLog("connectedCallback microtask", {
+        phase: "schedule-idle-or-await-focusin",
+      });
+      this._scheduleDeferredIdleCallback();
+    });
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._cancelDeferredDictionaryWaiters();
     this._cleanupNativeListeners?.();
     this._cleanupNativeListeners = null;
     this._unsub?.();
@@ -261,10 +483,14 @@ export class PinyinIMEEditor extends LitElement {
 
   override willUpdate(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has("getDictionary")) {
-      this._loadDictionary();
+      this._cancelDeferredDictionaryWaiters();
+      this._loadDictionary("property:getDictionary");
     }
   }
 
+  /**
+   * 首屏渲染后挂载控制器与原生监听；末尾用 `queueMicrotask` 再请求一次更新（与控制器订阅里推迟的 `requestUpdate` 一致，避免 Lit change-in-update）。
+   */
   override firstUpdated(): void {
     const el = this.inputRef.value;
     if (!el) return;
@@ -282,10 +508,13 @@ export class PinyinIMEEditor extends LitElement {
 
     this._unsub = this._controller.subscribe(() => {
       this._syncPosition();
-      this.requestUpdate();
+      queueMicrotask(() => this.requestUpdate());
     });
-    this.requestUpdate();
+    queueMicrotask(() => this.requestUpdate());
     this._cleanupNativeListeners = this._bindNativeListeners(el);
+    if (this._dictionaryState !== "ready") {
+      this._attachDeferredFocusKickoff(el);
+    }
   }
 
   /**
@@ -397,7 +626,6 @@ export class PinyinIMEEditor extends LitElement {
         composed: true,
       })
     );
-    this.requestUpdate();
   }
 
   override updated(changedProperties: PropertyValues<this>): void {

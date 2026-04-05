@@ -108,36 +108,57 @@ document.body.append(el);
 
 | 属性（HTML）      | 类型                     | 默认值       | 说明             |
 | ------------- | ---------------------- | --------- | -------------- |
-| `value`       | `string`               | `""`      | 受控文本（property） |
-| `editor-type` | `"input" | "textarea"` | `"input"` | 单行或多行宿主        |
-| `page-size`   | `number`               | `5`       | 每页候选数（1–9）     |
-| `enabled`     | `boolean`              | `true`    | 是否启用 IME 逻辑    |
+| `value`       | `string`               | `""`      | 受控文本（property）；属性缺失或移除时按空串 |
+| `editor-type` | `"input" \| "textarea"` | `"input"` | 单行或多行宿主；仅 `textarea`（忽略大小写与首尾空白）为多行，**其它任意值按 `input`** |
+| `page-size`   | `number`               | `5`       | 每页候选数；解析为整数后经内部限制为 **1–9**，**无法解析或非有限数时按默认 5** |
+| `enabled`     | `boolean`              | `true`    | 是否启用 IME 逻辑（见下 **字符串语义**） |
+| `popup-position` | `"top" \| "bottom" \| "left" \| "right"` | `"top"` | 候选框相对输入框的方位；**非法值按 `top`** |
 
+**`enabled`（HTML 字符串）**
+
+- **关闭**：`enabled="false"`，以及 `0`、`off`、`no`、`disabled`（忽略大小写与首尾空白）。
+- **开启**：无该属性、或 `enabled` 布尔属性（值为空串）、或 `true`、`1`、`on`、`yes`。
+- **无法识别的非空字符串**：按 **开启** 处理（偏安全默认）；反射到 DOM 时，开启会 **省略** 属性，关闭为 `enabled="false"`。
+
+**`popup-position`**
+
+与 JavaScript 的 `popupPosition` 一致；仅上述四个小写方位名有效（属性中大小写不敏感），其它字符串兜底为 `top`。
+
+
+**词典首次加载（统一推迟）**
+
+- 挂载后不在同步路径立即拉词典；`connectedCallback` 内 **`queueMicrotask`** 再排队 **`requestIdleCallback`**（`timeout: 2000ms`；不支持时用 `setTimeout(0)`），与 **内部输入框 `focusin`（捕获阶段）** **竞速**，**先发生者**触发首次加载。这样同一宏任务内 React **`useLayoutEffect`** / Vue 等可先写入 **`getDictionary`**，减少「先默认 google、再自定义」的固定双拉。
+- **`getDictionary` 变更**（property）：Lit `willUpdate` 会**取消**上述 idle / focus 等待并**立即** `_loadDictionary`；用户主动换词典时的第二次加载为预期行为。
+- **开发日志**：非生产构建下（`process.env.NODE_ENV !== "production"`）可向控制台输出轨迹，前缀 **`[pinyin-ime-editor dictionary]`**；`trigger` 形如 **`deferred:idle`** / **`deferred:focusin`** / **`property:getDictionary`**。
+
+多实例使用**同一份**默认包内词典（同一对象引用）时，`createPinyinEngine` 会**复用同一引擎**，避免重复构建 trie / 索引，降低内存与主线程尖峰。
+
+**v2 破坏性变更**：已移除 HTML 属性 **`dictionary-load`** 与对应 property；该名仍列入下方**不透传**列表，旧页面上的 `dictionary-load="..."` 会留在宿主上、不会落到内部 `<input>`。
 
 ### 2.2 仅 JavaScript property（无 HTML attribute）
 
 以下只能通过 property 赋值（无对应 attribute）：
 
 ```ts
-type PopupPlacement = "top" | "bottom" | "left" | "right";
 type GetDictionaryFn = () => Promise<PinyinDict> | PinyinDict;
 ```
 
-- `**popupPosition**`：候选框相对输入框位置，默认 `"top"`。
 - `**getDictionary**`：初始化时调用；返回词典或 Promise；resolve 前候选框显示「加载中…」。未设置时默认加载包内 google 词典。
+
+候选框方位也可在 HTML 中写 **`popup-position`**（见上表）；`popupPosition` property 与之对应。
 
 主包另导出 `**packagedDictionaryModuleUrl("google" | "dota2")**`：返回包内词典 ESM 的绝对 URL，供 `import(url)` 兜底；自定义词典请优先在 **`getDictionary`** 里使用 `import("pinyin-ime/dictionary/...")` 或 `fetch`。
 
 ```js
 const el = document.querySelector("pinyin-ime-editor");
-el.popupPosition = "bottom";
+el.popupPosition = "bottom"; // 或与属性 popup-position="bottom" 等价
 el.getDictionary = () =>
   fetch("https://example.com/dict.json").then((r) => r.json());
 ```
 
 ### 2.3 属性透传
 
-除 `value`、`editor-type`、`page-size`、`enabled`、`class` 外，其它 attribute 会透传到内部的 `<input>` 或 `<textarea>`，便于进一步定制（如 `placeholder`、`disabled`、`rows` 等）：
+除 `value`、`editor-type`、`page-size`、`enabled`、**`dictionary-load`（已废弃，仅保留为不透传占位）**、`popup-position`、`class` 外，其它 attribute 会透传到内部的 `<input>` 或 `<textarea>`，便于进一步定制（如 `placeholder`、`disabled`、`rows` 等）：
 
 ```html
 <pinyin-ime-editor placeholder="请输入" rows="6" editor-type="textarea" />

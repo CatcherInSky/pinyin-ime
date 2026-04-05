@@ -8,7 +8,12 @@ import vue from "@vitejs/plugin-vue";
  * Vite config for validating local `dist` artifacts before publish.
  * All `pinyin-ime` imports are resolved to monorepo `../dist`.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(
+      mode === "production" ? "production" : "development"
+    ),
+  },
   resolve: {
     alias: [
       {
@@ -63,4 +68,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

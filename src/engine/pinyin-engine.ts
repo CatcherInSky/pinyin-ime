@@ -178,13 +178,16 @@ function getKeysByPrefix(
   return node.keysUnderPrefix;
 }
 
+/** 同一 {@link PinyinDict} 对象引用复用引擎，避免多实例重复建索引。 */
+const pinyinEngineByDict = new WeakMap<PinyinDict, PinyinEngine>();
+
 /**
- * 基于给定词典创建拼音引擎；同一词典可复用同一实例以避免重复构建索引。
+ * 基于给定词典构建拼音引擎（不查缓存；由 {@link createPinyinEngine} 内部调用）。
  *
  * @param dict - 与 {@link PinyinDict} 同形的记录表
  * @returns `getCandidates` 与 `computeMatchedLength`
  */
-export function createPinyinEngine(dict: PinyinDict): PinyinEngine {
+function createPinyinEngineUncached(dict: PinyinDict): PinyinEngine {
   const d = dict as Record<string, WordFreq[] | undefined>;
   const wordMaxFreqByWord = buildWordMaxFreqByWord(d);
   const wordKeysIndex = buildWordKeysIndex(d);
@@ -475,4 +478,18 @@ export function createPinyinEngine(dict: PinyinDict): PinyinEngine {
   }
 
   return { getCandidates, computeMatchedLength };
+}
+
+/**
+ * 基于给定词典创建拼音引擎；**同一 `dict` 对象引用**返回同一实例，共享前缀缓存与索引。
+ *
+ * @param dict - 与 {@link PinyinDict} 同形的记录表；传入后请勿再修改其内容。
+ * @returns `getCandidates` 与 `computeMatchedLength`
+ */
+export function createPinyinEngine(dict: PinyinDict): PinyinEngine {
+  const hit = pinyinEngineByDict.get(dict);
+  if (hit) return hit;
+  const engine = createPinyinEngineUncached(dict);
+  pinyinEngineByDict.set(dict, engine);
+  return engine;
 }

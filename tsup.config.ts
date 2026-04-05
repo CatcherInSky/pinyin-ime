@@ -26,6 +26,9 @@ function cleanupDistArtifacts(): void {
  *
  * @returns tsup 配置数组
  */
+/** 供 `element.ts` 中 `process.env.NODE_ENV` 在浏览器产物里折叠为字面量。 */
+const nodeEnv = JSON.stringify(process.env.NODE_ENV ?? "production");
+
 export default defineConfig([
   {
     entry: { index: "src/index.ts" },
@@ -36,6 +39,9 @@ export default defineConfig([
     outDir: "dist",
     treeshake: true,
     splitting: false,
+    define: {
+      "process.env.NODE_ENV": nodeEnv,
+    },
     ...minify,
     noExternal: [/^lit(\/|$)/],
     external: [
@@ -55,6 +61,9 @@ export default defineConfig([
     outDir: "dist",
     treeshake: true,
     splitting: false,
+    define: {
+      "process.env.NODE_ENV": nodeEnv,
+    },
     ...minify,
     noExternal: [/^lit(\/|$)/],
     external: ["./google_pinyin_dict"],

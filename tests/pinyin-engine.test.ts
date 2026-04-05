@@ -30,4 +30,17 @@ describe("createPinyinEngine", () => {
     const engine = createPinyinEngine(tinyDict);
     expect(engine.getCandidates("").candidates).toEqual([]);
   });
+
+  it("reuses the same engine instance for the same dict object reference", () => {
+    const a = createPinyinEngine(tinyDict);
+    const b = createPinyinEngine(tinyDict);
+    expect(a).toBe(b);
+  });
+
+  it("creates distinct engines for distinct dict object references", () => {
+    const copy: PinyinDict = { ...tinyDict };
+    const a = createPinyinEngine(tinyDict);
+    const b = createPinyinEngine(copy);
+    expect(a).not.toBe(b);
+  });
 });

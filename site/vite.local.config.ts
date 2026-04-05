@@ -9,7 +9,12 @@ import vue from "@vitejs/plugin-vue";
  * - `pinyin-ime` and dictionary subpath imports resolve to monorepo local sources.
  * - keeps the same multi-page entries/base as `vite.config.ts`.
  */
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(
+      mode === "production" ? "production" : "development"
+    ),
+  },
   resolve: {
     alias: [
       {

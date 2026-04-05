@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { getDemoRoutes } from "../common/demo-routes";
+import { DEMO_CDN_GOOGLE_PINYIN_DICT } from "../common/demo-cdn";
 import { PinyinIMEEditor } from "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
@@ -12,16 +13,37 @@ if (!customElements.get("pinyin-ime-editor")) {
 type DictEntry = { w: string; f: number };
 type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
+  value: string;
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
-const CDN_DICT_URL =
-  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
+const VUE_LOCAL_CODE = `<script setup lang="ts">
+import { ref } from "vue";
+import { PinyinIMEEditor } from "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
+
+const textInput = ref("");
+function onInputChange(e: Event) {
+  textInput.value = (e as CustomEvent<{ value: string }>).detail.value;
+}
+<\/script>
+
+<template>
+  <pinyin-ime-editor :value="textInput" @change="onInputChange" />
+</template>`;
 
 const VUE_CDN_CODE = `<script setup lang="ts">
 import { onMounted, ref } from "vue";
-import "pinyin-ime";
+import { PinyinIMEEditor } from "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
+
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
 
 type DictEntry = { w: string; f: number };
 type PinyinDict = Record<string, DictEntry[]>;
@@ -29,9 +51,13 @@ type PinyinHostEl = HTMLElement & {
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
-const CDN_DICT_URL =
-  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
+const CDN_DICT_URL = "${DEMO_CDN_GOOGLE_PINYIN_DICT}";
 const editorRef = ref<PinyinHostEl | null>(null);
+const textTextarea = ref("");
+
+function onTextareaChange(e: Event) {
+  textTextarea.value = (e as CustomEvent<{ value: string }>).detail.value;
+}
 
 onMounted(() => {
   const el = editorRef.value;
@@ -46,17 +72,14 @@ onMounted(() => {
 <\/script>
 
 <template>
-  <pinyin-ime-editor ref="editorRef" editor-type="textarea" />
-<\/template>`;
-const VUE_LOCAL_CODE = `<script setup lang="ts">
-import "pinyin-ime";
-import "pinyin-ime/pinyin-ime.css";
-<\/script>
-
-<template>
-  <!-- 本地词典（默认行为）：不设置 getDictionary -->
-  <pinyin-ime-editor />
-<\/template>`;
+  <pinyin-ime-editor
+    ref="editorRef"
+    editor-type="textarea"
+    popup-position="bottom"
+    :value="textTextarea"
+    @change="onTextareaChange"
+  />
+</template>`;
 
 const r = getDemoRoutes();
 
@@ -93,28 +116,27 @@ function onTextareaChange(e: Event) {
 }
 
 /**
- * Loads dictionary module from CDN and returns exported dict.
+ * 与演示代码块中的 `CDN_DICT_URL` 一致，从 CDN 加载 `dict`。
  *
- * @returns Promise of Google pinyin dictionary
+ * @returns 词典对象
  */
 async function loadCdnDict(): Promise<PinyinDict> {
-  const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
+  const mod = (await import(/* @vite-ignore */ DEMO_CDN_GOOGLE_PINYIN_DICT)) as {
     dict: PinyinDict;
   };
   return mod.dict;
 }
 
 /**
- * Assigns getDictionary function to demo editors after mount.
+ * 挂载后为多行示例设置 `getDictionary`（仅 property，无法用 HTML 表达）。
  */
-function bindDictionaryLoader(): void {
-  if (editorTextareaRef.value) {
-    editorTextareaRef.value.getDictionary = loadCdnDict;
-  }
+function bindTextareaCdnDictionary(): void {
+  const el = editorTextareaRef.value;
+  if (el) el.getDictionary = loadCdnDict;
 }
 
 onMounted(() => {
-  bindDictionaryLoader();
+  bindTextareaCdnDictionary();
 });
 </script>
 
@@ -145,16 +167,36 @@ onMounted(() => {
     <div>
       <h1 class="text-2xl font-semibold tracking-tight">Vue 3 演示</h1>
       <p class="mt-2 text-sm text-muted-foreground">
-        在模板中使用 <code class="rounded bg-muted px-1 py-0.5 text-xs">pinyin-ime-editor</code>；Vite 需在
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">@vitejs/plugin-vue</code> 中配置
-        <code class="rounded bg-muted px-1 py-0.5 text-xs">isCustomElement</code>（见
+        模板中直接使用
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">pinyin-ime-editor</code>
+        ；HTML 属性如
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">editor-type</code>、
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">popup-position</code>
+        写在标签上。
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">getDictionary</code>
+        在
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">onMounted</code>
+        里尽早赋值（首载已统一推迟，与内部 idle / focusin 对齐）。Vite 需在
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">@vitejs/plugin-vue</code>
+        中配置
+        <code class="rounded bg-muted px-1 py-0.5 text-xs">isCustomElement</code>
+        （见
         <code class="rounded bg-muted px-1 py-0.5 text-xs">site/vite.config.ts</code>）。
       </p>
     </div>
 
     <section class="space-y-2">
-      <h2 class="text-lg font-semibold">单行（默认 input）</h2>
-      <pinyin-ime-editor ref="editorInputRef" :value="textInput" @change="onInputChange" />
+      <h2 class="text-lg font-semibold">单行（默认包内 google 词典）</h2>
+      <p class="text-xs text-muted-foreground">
+        不设
+        <code class="rounded bg-muted px-1 py-0.5 text-[11px]">getDictionary</code>
+        时使用默认包内 google 词典；首载时机与多行示例相同（统一推迟）。
+      </p>
+      <pinyin-ime-editor
+        ref="editorInputRef"
+        :value="textInput"
+        @change="onInputChange"
+      />
       <p class="text-xs text-muted-foreground">
         受控值：<span class="font-mono">{{ JSON.stringify(textInput) }}</span>
       </p>
@@ -162,10 +204,19 @@ onMounted(() => {
     </section>
 
     <section class="space-y-2">
-      <h2 class="text-lg font-semibold">多行（editor-type=&quot;textarea&quot;）</h2>
+      <h2 class="text-lg font-semibold">
+        多行（editor-type + popup-position + CDN getDictionary）
+      </h2>
+      <p class="text-xs text-muted-foreground">
+        词典 URL：
+        <code class="rounded bg-muted px-1 py-0.5 text-[11px] break-all">{{
+          DEMO_CDN_GOOGLE_PINYIN_DICT
+        }}</code>
+      </p>
       <pinyin-ime-editor
         ref="editorTextareaRef"
         editor-type="textarea"
+        popup-position="bottom"
         :value="textTextarea"
         @change="onTextareaChange"
       />
@@ -181,6 +232,5 @@ onMounted(() => {
         <li v-for="line in SHORTCUT_LINES" :key="line">{{ line }}</li>
       </ul>
     </section>
-
   </main>
 </template>

@@ -1,12 +1,12 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { PinyinIMEEditor } from "pinyin-ime";
-import type { PopupPlacement } from "pinyin-ime";
 import { getDemoRoutes } from "../common/demo-routes";
+import { DEMO_CDN_GOOGLE_PINYIN_DICT } from "../common/demo-cdn";
 import "pinyin-ime/pinyin-ime.css";
 import "../common/index.css";
 // @ts-expect-error demo local js dictionary module
-import { dict as localDemoDict } from "./dict.js";
+import { dict } from "./dict.js";
 
 /** 兜底注册自定义元素，避免依赖包副作用导入被裁剪后组件未定义。 */
 if (!customElements.get("pinyin-ime-editor")) {
@@ -27,35 +27,109 @@ const SHORTCUT_LINES = [
   "Shift 单击：有拼音时上屏拼音（与 Enter 相同）；Shift+左右键仍用于扩选",
 ] as const;
 
-/** Lit 宿主上的受控 `value` 与自定义事件。 */
 type DictEntry = { w: string; f: number };
 type PinyinDict = Record<string, DictEntry[]>;
 type PinyinHostEl = HTMLElement & {
   value: string;
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
-  popupPosition?: PopupPlacement;
 };
 
-const CDN_DICT_URL =
-  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.5.0/dist/dict.js";
-
-const REACT_CDN_CODE = `import { useEffect, useRef } from "react";
-import "pinyin-ime";
+const REACT_SETUP = `import React, { useLayoutEffect, useRef, useState } from "react";
+import { PinyinIMEEditor } from "pinyin-ime";
 import "pinyin-ime/pinyin-ime.css";
 
-type DictEntry = { w: string; f: number };
-type PinyinDict = Record<string, DictEntry[]>;
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}`;
+
+const REACT_DOTA2_CODE = `${REACT_SETUP}
+
+type PinyinDict = Record<string, { w: string; f: number }[]>;
 type PinyinHostEl = HTMLElement & {
+  value: string;
   getDictionary?: () => Promise<PinyinDict> | PinyinDict;
 };
 
-const CDN_DICT_URL =
-  "https://cdn.jsdelivr.net/npm/pinyin-ime@0.7.0/dist/dictionary/google_pinyin_dict.js";
-
-function TextareaWithCdnDict() {
+export function Dota2DeferredDemo() {
+  const [value, setValue] = useState("");
   const ref = useRef<PinyinHostEl | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.getDictionary = () =>
+      import("pinyin-ime/dictionary/dota2_pinyin_dict").then((m) => m.dict);
+    const onChange = (e: Event) =>
+      setValue((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && el.value !== value) el.value = value;
+  }, [value]);
+
+  return (
+    <pinyin-ime-editor
+      ref={ref}
+      className="w-full"
+    />
+  );
+}`;
+
+const REACT_LOCAL_CODE = `import React, { useLayoutEffect, useRef, useState } from "react";
+import { PinyinIMEEditor } from "pinyin-ime";
+import "pinyin-ime/pinyin-ime.css";
+import { dict } from "./dict.js";
+
+if (!customElements.get("pinyin-ime-editor")) {
+  customElements.define("pinyin-ime-editor", PinyinIMEEditor);
+}
+
+type PinyinDict = Record<string, { w: string; f: number }[]>;
+type PinyinHostEl = HTMLElement & {
+  value: string;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
+};
+
+export function LocalDictDemo() {
+  const [value, setValue] = useState("");
+  const ref = useRef<PinyinHostEl | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.getDictionary = () => dict;
+    const onChange = (e: Event) =>
+      setValue((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && el.value !== value) el.value = value;
+  }, [value]);
+
+  return <pinyin-ime-editor ref={ref} className="w-full" />;
+}`;
+
+const REACT_TEXTAREA_CDN_CODE = `${REACT_SETUP}
+
+type PinyinDict = Record<string, { w: string; f: number }[]>;
+type PinyinHostEl = HTMLElement & {
+  value: string;
+  getDictionary?: () => Promise<PinyinDict> | PinyinDict;
+};
+
+const CDN_DICT_URL = "${DEMO_CDN_GOOGLE_PINYIN_DICT}";
+
+export function TextareaCdnDemo() {
+  const [value, setValue] = useState("");
+  const ref = useRef<PinyinHostEl | null>(null);
+
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.getDictionary = async () => {
@@ -64,199 +138,29 @@ function TextareaWithCdnDict() {
       };
       return mod.dict;
     };
+    const onChange = (e: Event) =>
+      setValue((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
   }, []);
-
-  return <pinyin-ime-editor ref={ref} editor-type="textarea" />;
-}`;
-
-const REACT_DOTA2_CODE = `import { useEffect, useRef } from "react";
-import "pinyin-ime";
-import "pinyin-ime/pinyin-ime.css";
-
-function InputWithDota2() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.getDictionary = () =>
-      import("pinyin-ime/dictionary/dota2_pinyin_dict").then((m) => m.dict);
-  }, []);
-  return <pinyin-ime-editor ref={ref} />;
-}`;
-
-const REACT_LOCAL_CODE = `import { useEffect, useRef } from "react";
-import "pinyin-ime";
-import "pinyin-ime/pinyin-ime.css";
-import { dict } from "./dict.js";
-
-function InputWithLocalDict() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.getDictionary = () => dict;
-  }, []);
-  return <pinyin-ime-editor ref={ref} />;
-}`;
-
-/**
- * Loads dictionary module from CDN and returns exported dict.
- *
- * @returns Promise of Google pinyin dictionary
- */
-async function loadCdnDict(): Promise<PinyinDict> {
-  const mod = (await import(/* @vite-ignore */ CDN_DICT_URL)) as {
-    dict: PinyinDict;
-  };
-  return mod.dict;
-}
-
-/**
- * 加载包内 Dota2 合并词典（与 `package.json` exports 一致）。
- *
- * @returns Dota2 + Google 合并词典
- */
-async function loadDota2Dict(): Promise<PinyinDict> {
-  const m = await import("pinyin-ime/dictionary/dota2_pinyin_dict");
-  return m.dict;
-}
-
-/**
- * 加载本地演示词典 `./dict.js`（仅含 `dd -> test`）。
- *
- * @returns 本地演示词典
- */
-async function loadLocalDict(): Promise<PinyinDict> {
-  return localDemoDict as PinyinDict;
-}
-
-/**
- * 在 React 中受控使用 `<pinyin-ime-editor>`：同步 `value` 并转发 `pinyin-ime-change`。
- *
- * @param props - 受控值、回调与可选 `variant`
- * @returns JSX
- */
-function PinyinImeEditorCtl(props: {
-  value: string;
-  onValueChange: (v: string) => void;
-  variant?: "input" | "textarea";
-  className?: string;
-  /** 词典加载函数；未提供时走组件默认包内词典 */
-  getDictionaryFn?: () => Promise<PinyinDict> | PinyinDict;
-  popupPosition?: PopupPlacement;
-}) {
-  const {
-    value,
-    onValueChange,
-    variant,
-    className,
-    getDictionaryFn,
-    popupPosition,
-  } = props;
-  const ref = useRef<PinyinHostEl | null>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    /**
-     * @param e - `pinyin-ime` 自定义事件
-     */
-    const handler = (e: Event) => {
-      onValueChange((e as CustomEvent<{ value: string }>).detail.value);
-    };
-    el.addEventListener("change", handler);
-    return () => el.removeEventListener("change", handler);
-  }, [onValueChange]);
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && el.value !== value) {
-      el.value = value;
-    }
+    if (el && el.value !== value) el.value = value;
   }, [value]);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.popupPosition = popupPosition;
-  }, [popupPosition]);
 
   return (
     <pinyin-ime-editor
-      ref={(node) => {
-        const el = node as PinyinHostEl | null;
-        ref.current = el;
-        if (!el) return;
-        if (getDictionaryFn) {
-          el.getDictionary = getDictionaryFn;
-        } else {
-          delete el.getDictionary;
-        }
-      }}
-      className={className}
-      editor-type={variant}
+      ref={ref}
+      className="w-full"
+      editor-type="textarea"
+      popup-position="bottom"
     />
   );
-}
+}`;
 
 /**
- * 单行：包内 Dota2 词典。
- */
-function InputWithDota2Ctl(props: {
-  value: string;
-  onValueChange: (v: string) => void;
-  className?: string;
-}) {
-  return (
-    <PinyinImeEditorCtl
-      className={props.className}
-      value={props.value}
-      onValueChange={props.onValueChange}
-      getDictionaryFn={loadDota2Dict}
-    />
-  );
-}
-
-/**
- * 单行：本地 `./dict.js` 词典。
- */
-function InputWithLocalDictCtl(props: {
-  value: string;
-  onValueChange: (v: string) => void;
-  className?: string;
-}) {
-  return (
-    <PinyinImeEditorCtl
-      className={props.className}
-      value={props.value}
-      onValueChange={props.onValueChange}
-      getDictionaryFn={loadLocalDict}
-    />
-  );
-}
-
-/**
- * 多行：远程 CDN 词典。
- */
-function TextareaWithCdnDictCtl(props: {
-  value: string;
-  onValueChange: (v: string) => void;
-  className?: string;
-}) {
-  return (
-    <PinyinImeEditorCtl
-      className={props.className}
-      value={props.value}
-      onValueChange={props.onValueChange}
-      variant="textarea"
-      popupPosition="bottom"
-      getDictionaryFn={loadCdnDict}
-    />
-  );
-}
-
-/**
- * React 演示页：侧载 `import "pinyin-ime"` 注册 `<pinyin-ime-editor>`，受控展示单行与多行。
+ * React 演示页：页面内直接使用 {@link pinyin-ime-editor}，与下方 pre 中代码一致。
  *
  * @returns 页面 JSX
  */
@@ -265,6 +169,57 @@ function ReactDemoPage() {
   const [single, setSingle] = useState("");
   const [singleLocal, setSingleLocal] = useState("");
   const [multi, setMulti] = useState("");
+
+  const refDota = useRef<PinyinHostEl | null>(null);
+  useLayoutEffect(() => {
+    const el = refDota.current;
+    if (!el) return;
+    el.getDictionary = () =>
+      import("pinyin-ime/dictionary/dota2_pinyin_dict").then((m) => m.dict);
+    const onChange = (e: Event) =>
+      setSingle((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
+  }, []);
+  useLayoutEffect(() => {
+    const el = refDota.current;
+    if (el && el.value !== single) el.value = single;
+  }, [single]);
+
+  const refLocal = useRef<PinyinHostEl | null>(null);
+  useLayoutEffect(() => {
+    const el = refLocal.current;
+    if (!el) return;
+    el.getDictionary = () => dict;
+    const onChange = (e: Event) =>
+      setSingleLocal((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
+  }, []);
+  useLayoutEffect(() => {
+    const el = refLocal.current;
+    if (el && el.value !== singleLocal) el.value = singleLocal;
+  }, [singleLocal]);
+
+  const refCdnTa = useRef<PinyinHostEl | null>(null);
+  useLayoutEffect(() => {
+    const el = refCdnTa.current;
+    if (!el) return;
+    el.getDictionary = async () => {
+      const mod = (await import(/* @vite-ignore */ DEMO_CDN_GOOGLE_PINYIN_DICT)) as {
+        dict: PinyinDict;
+      };
+      return mod.dict;
+    };
+    const onChange = (e: Event) =>
+      setMulti((e as CustomEvent<{ value: string }>).detail.value);
+    el.addEventListener("change", onChange);
+    return () => el.removeEventListener("change", onChange);
+  }, []);
+  useLayoutEffect(() => {
+    const el = refCdnTa.current;
+    if (el && el.value !== multi) el.value = multi;
+  }, [multi]);
 
   return (
     <main className="mx-auto max-w-xl space-y-10 px-4 py-10">
@@ -299,39 +254,63 @@ function ReactDemoPage() {
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             import &quot;pinyin-ime&quot;
           </code>{" "}
-          注册自定义元素，模板中渲染{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            &lt;pinyin-ime-editor&gt;
-          </code>
-          ，并引入{" "}
+          与{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             pinyin-ime/pinyin-ime.css
           </code>
-          ；类型导出可选{" "}
+          ；模板中直接写{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            PinyinIMEEditor
+            &lt;pinyin-ime-editor&gt;
           </code>
-          。
+          。HTML 属性如{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            editor-type
+          </code>
+          、
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            popup-position
+          </code>
+          ；{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            getDictionary
+          </code>{" "}
+          仅可写 property。首载已统一推迟（
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            queueMicrotask
+          </code>{" "}
+          + idle 与内部{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">focusin</code>{" "}
+          竞速）；自定义词典请在{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            useLayoutEffect
+          </code>{" "}
+          （或同步 ref 回调）里尽早赋值{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            getDictionary
+          </code>
+          ，以便与 Lit 更新对齐。
         </p>
       </div>
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">单行（Dota2 词表）</h2>
         <p className="text-xs text-muted-foreground">
-          通过{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
             getDictionary
-          </code>
-          返回{" "}
+          </code>{" "}
+          在{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-            import(&quot;pinyin-ime/dictionary/dota2_pinyin_dict&quot;)
+            useLayoutEffect
+          </code>{" "}
+          中绑定，指向{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            dota2_pinyin_dict
           </code>
           。
         </p>
-        <InputWithDota2Ctl
+        <pinyin-ime-editor
+          ref={refDota}
           className="w-full"
-          value={single}
-          onValueChange={setSingle}
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(single)}</span>
@@ -344,19 +323,19 @@ function ReactDemoPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">单行（本地词典：dd -&gt; test）</h2>
         <p className="text-xs text-muted-foreground">
-          通过{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-            import("./dict.js")
+            getDictionary
           </code>{" "}
-          加载本地词典。
+          返回本地{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            ./dict.js
+          </code>
+          ；与默认包内 google 一样走统一推迟首载。
         </p>
-        <InputWithLocalDictCtl
-          className="w-full"
-          value={singleLocal}
-          onValueChange={setSingleLocal}
-        />
+        <pinyin-ime-editor ref={refLocal} className="w-full" />
         <p className="text-xs text-muted-foreground">
-          受控值：<span className="font-mono">{JSON.stringify(singleLocal)}</span>
+          受控值：
+          <span className="font-mono">{JSON.stringify(singleLocal)}</span>
         </p>
         <pre className="overflow-x-auto rounded bg-muted/40 p-3 text-xs">
           <code>{REACT_LOCAL_CODE}</code>
@@ -364,17 +343,35 @@ function ReactDemoPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">多行（variant = &quot;textarea&quot;）</h2>
-        <TextareaWithCdnDictCtl
+        <h2 className="text-lg font-semibold">
+          多行（editor-type + popup-position + CDN）
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          属性{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            editor-type=&quot;textarea&quot;
+          </code>
+          、
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            popup-position=&quot;bottom&quot;
+          </code>
+          ；词典来自{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            {DEMO_CDN_GOOGLE_PINYIN_DICT}
+          </code>
+          。
+        </p>
+        <pinyin-ime-editor
+          ref={refCdnTa}
           className="w-full"
-          value={multi}
-          onValueChange={setMulti}
+          editor-type="textarea"
+          popup-position="bottom"
         />
         <p className="text-xs text-muted-foreground">
           受控值：<span className="font-mono">{JSON.stringify(multi)}</span>
         </p>
         <pre className="overflow-x-auto rounded bg-muted/40 p-3 text-xs">
-          <code>{REACT_CDN_CODE}</code>
+          <code>{REACT_TEXTAREA_CDN_CODE}</code>
         </pre>
       </section>
 
@@ -386,7 +383,6 @@ function ReactDemoPage() {
           ))}
         </ul>
       </section>
-
     </main>
   );
 }

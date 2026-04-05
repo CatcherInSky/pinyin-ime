@@ -16,6 +16,9 @@ declare global {
           value?: string;
           "editor-type"?: "input" | "textarea";
           "page-size"?: number;
+          /** 与组件内 `parseEnabledFromAttribute` 一致：也可用字符串如 `"false"` */
+          enabled?: boolean | string;
+          "popup-position"?: "top" | "bottom" | "left" | "right";
         },
         HTMLElement
       >;
