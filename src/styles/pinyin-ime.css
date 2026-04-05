@@ -26,7 +26,7 @@
 
 .pinyin-ime-mode-badge {
   position: absolute;
-  top: 0.5rem;
+  bottom: 0.5rem;
   right: 0.5rem;
   line-height: 1;
   font-size: 0.65rem;
@@ -53,6 +53,7 @@
 
 .pinyin-ime-field--with-mode-badge {
   padding-right: 2rem;
+  padding-bottom: 1rem;
 }
 
 .pinyin-ime-textarea {
