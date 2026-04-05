@@ -155,6 +155,22 @@ function isShiftPhysicalCode(code: string): boolean {
 }
 
 /**
+ * 是否按「物理左右 Shift」处理：标准 `ShiftLeft` / `ShiftRight`，或部分环境 `key === "Shift"` 但 `code` 为空、空白或 `Unidentified` 等异常值。
+ *
+ * @param e - 键盘事件
+ * @returns 是否与左右 Shift 走相同分支（计数、单独点按切换中/英等）
+ */
+function isPhysicalShiftKeyEvent(e: KeyboardEvent): boolean {
+  if (isShiftPhysicalCode(e.code)) return true;
+  if (e.key !== "Shift") return false;
+  const c = (e.code ?? "").trim();
+  if (!c) return true;
+  if (c === "Unidentified") return true;
+  if (c === "Shift") return true;
+  return false;
+}
+
+/**
  * 拼音 IME 控制器：在原生事件上调用 {@link PinyinIMEController.handleBeforeInput} /
  * {@link PinyinIMEController.handleKeyDown}，通过 {@link PinyinIMEController.subscribe} 订阅 UI 更新。
  *
@@ -601,10 +617,11 @@ export class PinyinIMEController<
    * @remarks
    * 仅在松开「最后一个」仍按下的物理 Shift 键且本轮未组合其它键时生效；
    * 与 {@link PinyinIMEController.handleKeyDown} 中的 Shift 计数及 `shiftGestureOtherKeySeen` 配合。
+   * `key === "Shift"` 且 `code` 为空或非标准时与左右 Shift 同等对待。
    */
   handleKeyUp(e: KeyboardEvent): void {
     if (this.options.enabled === false) return;
-    if (!isShiftPhysicalCode(e.code)) return;
+    if (!isPhysicalShiftKeyEvent(e)) return;
 
     if (this.shiftPhysicalDown === 0) return;
     this.shiftPhysicalDown -= 1;
@@ -629,6 +646,7 @@ export class PinyinIMEController<
    * 处理 `keydown`（建议在 capture 阶段调用）。
    *
    * @param e - 原生 `KeyboardEvent`
+   * @remarks `key === "Shift"` 且 `code` 为空或非标准时与左右 Shift 同等对待。
    */
   handleKeyDown(e: KeyboardEvent): void {
     if (this.options.enabled === false) {
@@ -636,7 +654,7 @@ export class PinyinIMEController<
       return;
     }
 
-    if (isShiftPhysicalCode(e.code)) {
+    if (isPhysicalShiftKeyEvent(e)) {
       if (this.shiftPhysicalDown === 0) {
         this.shiftGestureOtherKeySeen = false;
       }
